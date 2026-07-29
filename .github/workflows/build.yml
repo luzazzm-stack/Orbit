@@ -38,13 +38,9 @@ jobs:
           cp app/build/outputs/apk/release/app-release.apk "dist/Orbit-v${VERSION}.apk"
           ls -la dist
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Orbit-APK
-          path: dist/*.apk
-          if-no-files-found: error
-
+      # Deliberately no actions/upload-artifact here: this account's Actions
+      # artifact storage quota is full, and release assets are stored
+      # separately, so publishing straight to a Release is the reliable path.
       - name: Publish release
         if: github.ref == 'refs/heads/main'
         uses: softprops/action-gh-release@v2
