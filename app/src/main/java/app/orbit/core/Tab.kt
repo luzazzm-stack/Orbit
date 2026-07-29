@@ -26,7 +26,14 @@ class Tab(val id: Int) {
      */
     var pendingLoad: String? = UrlUtils.HOME_URL
 
-    /** Cursor mode is per-tab: a video site wants a pointer, an article does not. */
+    /**
+     * Cursor mode is per-tab: a video site wants a pointer, an article does not.
+     *
+     * Always starts false. The "Pointer on websites" setting is applied by
+     * maybeAutoPointer once a page has loaded, which is what keeps it off the
+     * start page — that is our own UI, it navigates perfectly well by D-pad,
+     * and the setting says *websites*.
+     */
     var cursorMode: Boolean = false
 
     /**

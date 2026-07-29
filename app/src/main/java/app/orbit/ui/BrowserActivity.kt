@@ -781,7 +781,6 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     }
 
     private fun enablePointer(message: String?) {
-        Log.i(TAG, "enablePointer(msg=$message)", Throwable("pointer-enable-trace"))
         if (!cursor.enabled) {
             cursor.enable(b.cursorHost)
             tabs.activeWebView?.let { spatial.clear(it) }

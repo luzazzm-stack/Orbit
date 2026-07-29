@@ -39,7 +39,6 @@ class TabManager(
     fun newTab(url: String? = null, select: Boolean = true): Tab? {
         if (tabs.size >= MAX_TABS) return null
         val tab = Tab(nextId++)
-        tab.cursorMode = app.orbit.data.Prefs.pointerOnSites == "always"
         tab.url = url ?: UrlUtils.HOME_URL
         tab.pendingLoad = tab.url
         tabs.add(tab)
@@ -63,7 +62,6 @@ class TabManager(
     fun newBlankTab(inheritPrivacyFrom: Tab? = null): Tab? {
         if (tabs.size >= MAX_TABS) return null
         val tab = Tab(nextId++)
-        tab.cursorMode = app.orbit.data.Prefs.pointerOnSites == "always"
         tab.url = "about:blank"
         tab.title = "New tab"
         tab.pendingLoad = null
