@@ -69,6 +69,12 @@ class CursorController(
         if (!enabled) return
         stopLoop()
         pressed.clear()
+        // Leaving pointer mode mid-press would strand the page believing a
+        // finger is still down, after which it ignores every later tap.
+        if (downTime != 0L) {
+            dispatchPointer(MotionEvent.ACTION_CANCEL, 0)
+            downTime = 0L
+        }
         if (hovering) {
             sendHover(MotionEvent.ACTION_HOVER_EXIT)
             hovering = false
@@ -101,8 +107,11 @@ class CursorController(
 
     // ------------------------------------------------------------ key events
 
-    /** @return true when the event was consumed. */
-    fun onKeyDown(keyCode: Int): Boolean {
+    /**
+     * @param repeatCount the event's auto-repeat index; only 0 is a new press.
+     * @return true when the event was consumed.
+     */
+    fun onKeyDown(keyCode: Int, repeatCount: Int = 0): Boolean {
         if (!enabled) return false
         return when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
@@ -120,7 +129,11 @@ class CursorController(
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_BUTTON_A -> {
-                sendPress()
+                // Auto-repeat must not emit a second ACTION_DOWN: one physical
+                // press is one finger, and a stream of DOWNs with no UP between
+                // them is a malformed touch sequence that Chromium turns into
+                // duplicated clicks or a stuck drag.
+                if (repeatCount == 0) sendPress()
                 true
             }
             else -> false

@@ -143,13 +143,28 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     override fun onLowMemory() {
         super.onLowMemory()
-        // 1.7 GB box: shed every tab that is not on screen before the system
-        // decides to kill the whole process.
-        tabs.closeAllButActive()
-        toast("Freed memory — background tabs closed")
+        // 1.7 GB box: shed the renderer processes of every off-screen tab
+        // before the system kills the whole app. Freeze, never close — the tabs
+        // stay in the list with their state and wake on demand, so a memory
+        // warning cannot silently throw away what the user had open.
+        val frozen = tabs.freezeAllButActive()
+        if (frozen > 0) toast("Freed memory — $frozen background tabs suspended")
     }
 
     // ------------------------------------------------------------ web client
+
+    /**
+     * The tab that owns a WebView firing a client callback.
+     *
+     * One WebViewClient instance is installed per WebView, but up to three tabs
+     * are alive at once and background tabs keep loading. Resolving state
+     * through `tabs.active` instead of the firing `view` let a background tab
+     * overwrite the foreground tab's URL and title, and drive the omnibox.
+     */
+    private fun tabFor(view: WebView) = tabs.all.firstOrNull { it.webView === view }
+
+    /** True when this WebView is the one actually on screen. */
+    private fun isActive(view: WebView) = view === tabs.activeWebView
 
     private fun configureWebView(wv: WebView) {
         wv.webViewClient = object : WebViewClient() {
@@ -172,64 +187,81 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 request: WebResourceRequest
             ): Boolean {
                 val url = request.url?.toString() ?: return false
+                // Subframes must never be able to steer the top-level frame.
+                // loadUrl() always targets the top frame, so upgrading an http
+                // iframe here would let that iframe replace the whole page.
+                if (!request.isForMainFrame) return false
                 if (upgradeToHttps(view, url)) return true
                 return handleNonWebScheme(url)
             }
 
             @Deprecated("Kept for API < 24 devices")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                // The string overload is only called on API < 24, where the
+                // frame cannot be identified; this app's minSdk-21 devices are
+                // not the target hardware, so keep the simple behaviour.
                 if (upgradeToHttps(view, url)) return true
                 return handleNonWebScheme(url)
             }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
-                b.progress.visibility = View.VISIBLE
-                b.progress.progress = 5
-                setOmniboxText(url)
-                tabs.active?.url = url
-                updateBookmarkIcon(url)
-                closeFindBar()
+                tabFor(view)?.url = url
+                if (isActive(view)) {
+                    b.progress.visibility = View.VISIBLE
+                    b.progress.progress = 5
+                    setOmniboxText(url)
+                    updateBookmarkIcon(url)
+                    closeFindBar()
+                }
                 // Warm the DNS verdict for the page's own host while it loads,
                 // so its subresources hit a populated cache.
                 if (Prefs.doh) DohResolver.prefetch(UrlUtils.host(url))
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                b.progress.visibility = View.GONE
                 spatial.inject(view)
-                if (!UrlUtils.isHome(url)) maybeAutoPointer(view)
-                if (UrlUtils.isHome(url)) {
-                    injectHomeData(view)
-                    // Give the start page a visible selection straight away so
-                    // it never looks inert on launch.
-                    if (!cursor.enabled && !focusInChrome()) {
-                        view.requestFocus()
-                        view.postDelayed({ spatial.enter(view) }, 80)
-                    }
-                }
-                tabs.active?.let { tab ->
-                    tab.url = url
-                    tab.title = view.title ?: tab.title
-                }
-                if (!UrlUtils.isHome(url) && tabs.active?.isPrivate != true) {
+
+                val tab = tabFor(view)
+                tab?.url = url
+                tab?.title = view.title ?: tab?.title ?: ""
+
+                // Privacy is a property of the tab that loaded the page, not of
+                // whichever tab happens to be on screen when it finishes.
+                if (!UrlUtils.isHome(url) && tab?.isPrivate != true) {
                     Store.addHistory(url, view.title ?: "")
                 }
-                setOmniboxText(url)
-                updateNavButtons()
-                updateBookmarkIcon(url)
+
+                if (isActive(view)) {
+                    b.progress.visibility = View.GONE
+                    if (!UrlUtils.isHome(url)) maybeAutoPointer(view)
+                    if (UrlUtils.isHome(url)) {
+                        injectHomeData(view)
+                        // Give the start page a visible selection straight away
+                        // so it never looks inert on launch.
+                        if (!cursor.enabled && !focusInChrome()) {
+                            view.requestFocus()
+                            view.postDelayed({ spatial.enter(view) }, 80)
+                        }
+                    }
+                    setOmniboxText(url)
+                    updateNavButtons()
+                    updateBookmarkIcon(url)
+                    // Starting on the home page means no auto-hide was ever
+                    // armed; arm it now that there is real content behind it.
+                    if (toolbarVisible) scheduleToolbarAutoHide()
+                }
                 onTabsChanged()
-                // Starting on the home page means no auto-hide was ever armed;
-                // arm it now that there is real content behind the bar.
-                if (toolbarVisible) scheduleToolbarAutoHide()
             }
 
             override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
                 // Single-page apps navigate without a page load; re-inject so the
                 // spatial engine sees the new DOM.
-                tabs.active?.url = url
-                setOmniboxText(url)
-                updateNavButtons()
-                updateBookmarkIcon(url)
+                tabFor(view)?.url = url
+                if (isActive(view)) {
+                    setOmniboxText(url)
+                    updateNavButtons()
+                    updateBookmarkIcon(url)
+                }
                 view.postDelayed({ spatial.inject(view) }, 220)
             }
 
@@ -238,7 +270,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 request: WebResourceRequest,
                 error: android.webkit.WebResourceError
             ) {
-                if (request.isForMainFrame) {
+                if (request.isForMainFrame && isActive(view)) {
                     b.progress.visibility = View.GONE
                     toast("Could not load page")
                 }
@@ -248,18 +280,23 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         wv.webChromeClient = object : WebChromeClient() {
 
             override fun onProgressChanged(view: WebView, newProgress: Int) {
+                if (!isActive(view)) return
                 b.progress.progress = newProgress
                 b.progress.visibility = if (newProgress in 1..99) View.VISIBLE else View.GONE
             }
 
             override fun onReceivedTitle(view: WebView, title: String?) {
-                tabs.active?.title = title ?: ""
+                tabFor(view)?.title = title ?: ""
                 onTabsChanged()
             }
 
             override fun onReceivedIcon(view: WebView, icon: android.graphics.Bitmap?) {
-                // The best icon source we have: Chromium already decoded it,
-                // including real .ico files that BitmapFactory cannot read.
+                // Never cache an icon for a private tab: the PNG would outlive
+                // the session on disk and enumerate exactly the hosts private
+                // browsing is supposed to leave no record of.
+                if (tabFor(view)?.isPrivate == true) return
+                // Otherwise the best icon source we have: Chromium already
+                // decoded it, including real .ico files BitmapFactory cannot.
                 FaviconStore.saveFromWebView(UrlUtils.host(view.url), icon)
             }
 
@@ -277,7 +314,8 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 isUserGesture: Boolean,
                 resultMsg: Message
             ): Boolean {
-                val tab = tabs.newBlankTab()
+                // A popup opened from a private tab must stay private.
+                val tab = tabs.newBlankTab(inheritPrivacyFrom = tabFor(view))
                 val target = tab?.webView
                 if (target == null) {
                     toast(getString(R.string.tab_limit))
@@ -378,7 +416,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         if (UrlUtils.isHttp(url) || url.startsWith("file:") || url.startsWith("about:")) return false
         return try {
             val intent = if (url.startsWith("intent:")) {
-                Intent.parseUri(url, Intent.URI_INTENT_SCHEME)
+                Intent.parseUri(url, Intent.URI_INTENT_SCHEME).also { sanitise(it) }
             } else {
                 Intent(Intent.ACTION_VIEW, Uri.parse(url))
             }
@@ -389,6 +427,28 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             Log.i(TAG, "no handler for $url")
             true // swallow: better than showing a WebView error page
         }
+    }
+
+    /**
+     * Strip everything a page could use to aim an intent somewhere it should
+     * not reach.
+     *
+     * `Intent.parseUri` faithfully preserves an explicit component, a selector
+     * and arbitrary extras, so an `intent://…;component=…;end` URL in any page
+     * — including a third-party ad frame — would otherwise launch a chosen
+     * activity that was never meant to be reachable from the web, with
+     * attacker-supplied extras. Requiring BROWSABLE limits the target to
+     * activities that opted in to being opened by a browser.
+     */
+    private fun sanitise(intent: Intent) {
+        intent.component = null
+        intent.selector = null
+        intent.addCategory(Intent.CATEGORY_BROWSABLE)
+        intent.flags = intent.flags and
+            (Intent.FLAG_GRANT_READ_URI_PERMISSION or
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION or
+                Intent.FLAG_GRANT_PREFIX_URI_PERMISSION).inv()
     }
 
     private fun startDownload(
@@ -739,12 +799,43 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     // ------------------------------------------------------------ key handling
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // A fullscreen video owns the remote completely. The custom view is not
+        // part of the chrome, so without this the page underneath would keep
+        // eating every arrow and OK — leaving the player's own controls
+        // unreachable and letting OK click a link on the hidden page.
+        if (fullscreenView != null) return dispatchFullscreenKey(event)
+
         if (handleGlobalKey(event)) return true
         if (focusInChrome()) {
             if (handleChromeKey(event)) return true
             return super.dispatchKeyEvent(event)
         }
         if (handlePageKey(event)) return true
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun dispatchFullscreenKey(event: KeyEvent): Boolean {
+        val down = event.action == KeyEvent.ACTION_DOWN
+        when (event.keyCode) {
+            KeyEvent.KEYCODE_BACK -> {
+                if (down) exitFullscreen()
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE, KeyEvent.KEYCODE_MEDIA_PLAY,
+            KeyEvent.KEYCODE_MEDIA_PAUSE -> {
+                if (down) tabs.activeWebView?.let { spatial.playPause(it) }
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD, KeyEvent.KEYCODE_MEDIA_NEXT -> {
+                if (down) tabs.activeWebView?.let { spatial.seek(it, 15) }
+                return true
+            }
+            KeyEvent.KEYCODE_MEDIA_REWIND, KeyEvent.KEYCODE_MEDIA_PREVIOUS -> {
+                if (down) tabs.activeWebView?.let { spatial.seek(it, -15) }
+                return true
+            }
+        }
+        // Everything else goes to the player's own view hierarchy.
         return super.dispatchKeyEvent(event)
     }
 
@@ -767,14 +858,6 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private fun handleGlobalKey(event: KeyEvent): Boolean {
         val down = event.action == KeyEvent.ACTION_DOWN
-
-        if (fullscreenView != null) {
-            if (event.keyCode == KeyEvent.KEYCODE_BACK && down) {
-                exitFullscreen()
-                return true
-            }
-            return false
-        }
 
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK -> if (down) return handleBack()
@@ -860,15 +943,28 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         val down = event.action == KeyEvent.ACTION_DOWN
 
         if (cursor.enabled) {
-            return if (down) cursor.onKeyDown(event.keyCode) else cursor.onKeyUp(event.keyCode)
+            return if (down) cursor.onKeyDown(event.keyCode, event.repeatCount)
+            else cursor.onKeyUp(event.keyCode)
         }
 
         SpatialNav.directionOf(event.keyCode)?.let { dir ->
             if (!down) return true
+            // With JavaScript off there is no spatial engine at all, so going
+            // through it would swallow the key and leave the remote dead.
+            if (!Prefs.javaScript) {
+                fallbackNavigate(wv, dir)
+                return true
+            }
             spatial.move(wv, dir) { outcome ->
-                if (outcome == SpatialNav.Outcome.EDGE && dir == "up") {
-                    // Nothing above on the page: the toolbar is what is "up".
-                    showToolbar(focus = true)
+                when (outcome) {
+                    // EDGE means the page had nothing further that way; ERROR
+                    // and NONE mean the engine could not answer at all (script
+                    // blocked by CSP, page still blank, injection failed).
+                    // Never leave the press doing nothing.
+                    SpatialNav.Outcome.EDGE,
+                    SpatialNav.Outcome.ERROR,
+                    SpatialNav.Outcome.NONE -> fallbackNavigate(wv, dir)
+                    else -> Unit
                 }
             }
             return true
@@ -904,6 +1000,12 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                                     enablePointer("Pointer mode — press OK to click inside")
                                     cursor.placeAt(cx, cy)
                                 }
+                                // No engine to click with (JavaScript off, CSP
+                                // blocked the injection). Hand over the pointer
+                                // rather than letting OK do nothing at all.
+                                SpatialNav.Outcome.ERROR,
+                                SpatialNav.Outcome.NONE ->
+                                    enablePointer("Pointer mode — this page can't be browsed by links")
                                 else -> Unit
                             }
                         }
@@ -934,6 +1036,29 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             }
         }
         return false
+    }
+
+    /**
+     * What a direction key does when the spatial engine cannot help.
+     *
+     * This is the escape hatch that keeps the remote alive: scroll natively if
+     * the page can scroll that way, and otherwise treat UP as "show me the
+     * toolbar". Without it, a page with no working engine — JavaScript turned
+     * off, a strict CSP, a blank tab — swallowed every arrow, and once the
+     * toolbar auto-hid there was no way back to it at all.
+     */
+    private fun fallbackNavigate(wv: WebView, dir: String) {
+        val moved = when (dir) {
+            "down" -> wv.pageDown(false)
+            "up" -> wv.pageUp(false)
+            else -> {
+                val by = if (dir == "right") 240 else -240
+                val before = wv.scrollX
+                wv.scrollBy(by, 0)
+                wv.scrollX != before
+            }
+        }
+        if (!moved && dir == "up") showToolbar(focus = true)
     }
 
     /** Holding OK on a page switches to the pointer. */

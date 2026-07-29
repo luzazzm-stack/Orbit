@@ -100,10 +100,26 @@
     return true;
   }
 
+  /**
+   * The subtree navigation is confined to.
+   *
+   * Reader mode lays a fixed overlay over the page and sets the document to
+   * overflow:hidden. The page underneath is merely *covered*, not hidden, so
+   * without scoping it still supplies candidates — and because its header sits
+   * at top≈0 it always outscores the reader's own first link. Focus would land
+   * on an invisible element, scrolling would do nothing, and OK would navigate
+   * away from the article.
+   */
+  function scopeRoot() {
+    var r = window.__ORBIT_READER_ROOT__;
+    if (r && document.contains(r)) return r;
+    return document;
+  }
+
   function candidates() {
     var out = [];
     var list;
-    try { list = document.querySelectorAll(FOCUSABLE); } catch (e) { return out; }
+    try { list = scopeRoot().querySelectorAll(FOCUSABLE); } catch (e) { return out; }
     for (var i = 0; i < list.length; i++) {
       var el = list[i];
       if (el === current) continue;
@@ -176,11 +192,22 @@
     return null;
   }
 
+  /** The element that scrolls when nothing more specific can: overlay or page. */
+  function scroller() {
+    var r = scopeRoot();
+    if (r !== document) return r;
+    return document.scrollingElement || document.documentElement;
+  }
+
   function pageCanScroll(dir) {
-    var doc = document.scrollingElement || document.documentElement;
-    if (dir === 'down') return doc.scrollTop + vh() < doc.scrollHeight - 2;
+    var doc = scroller();
+    var h = (doc === document.scrollingElement || doc === document.documentElement)
+      ? vh() : doc.clientHeight;
+    var w = (doc === document.scrollingElement || doc === document.documentElement)
+      ? vw() : doc.clientWidth;
+    if (dir === 'down') return doc.scrollTop + h < doc.scrollHeight - 2;
     if (dir === 'up') return doc.scrollTop > 2;
-    if (dir === 'right') return doc.scrollLeft + vw() < doc.scrollWidth - 2;
+    if (dir === 'right') return doc.scrollLeft + w < doc.scrollWidth - 2;
     return doc.scrollLeft > 2;
   }
 
@@ -197,7 +224,13 @@
       return true;
     }
     if (pageCanScroll(dir)) {
-      try { window.scrollBy(opts); } catch (e) { window.scrollBy(dx, dy); }
+      var s = scroller();
+      if (s !== document.scrollingElement && s !== document.documentElement) {
+        // Reader mode: the document itself is pinned, so scroll the overlay.
+        try { s.scrollBy(opts); } catch (e) { s.scrollTop += dy; s.scrollLeft += dx; }
+      } else {
+        try { window.scrollBy(opts); } catch (e) { window.scrollBy(dx, dy); }
+      }
       return true;
     }
     return false;

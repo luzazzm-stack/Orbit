@@ -30,9 +30,15 @@
         </intent>
     </queries>
 
+    <!-- allowBackup is off deliberately. With it on and no backup-rules file,
+         Android's default full-backup set ships the entire browsing profile off
+         the device: history.json, bookmarks, downloads, cached favicons and the
+         WebView cookie/localStorage databases. That would survive "Clear
+         history" and undo private browsing on any restore. -->
     <application
         android:name=".OrbitApp"
-        android:allowBackup="true"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
         android:banner="@drawable/tv_banner"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"

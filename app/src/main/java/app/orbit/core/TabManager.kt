@@ -60,13 +60,16 @@ class TabManager(
      * A tab that comes up empty, for window.open(): Chromium drives the first
      * navigation itself, so loading a start page here would race it.
      */
-    fun newBlankTab(): Tab? {
+    fun newBlankTab(inheritPrivacyFrom: Tab? = null): Tab? {
         if (tabs.size >= MAX_TABS) return null
         val tab = Tab(nextId++)
         tab.cursorMode = app.orbit.data.Prefs.pointerOnSites == "always"
         tab.url = "about:blank"
         tab.title = "New tab"
         tab.pendingLoad = null
+        // A window.open() popup inherits the opener's privacy, otherwise a
+        // target=_blank link would silently drop the user out of private mode.
+        tab.isPrivate = inheritPrivacyFrom?.isPrivate == true
         tabs.add(tab)
         select(tabs.size - 1)
         return tab
@@ -120,16 +123,18 @@ class TabManager(
 
     fun closeActive() { active?.let { close(it) } }
 
-    fun closeAllButActive() {
-        val keep = active ?: return
-        tabs.filter { it !== keep }.forEach {
-            it.webView?.let { wv -> destroy(wv) }
-            it.webView = null
-            it.savedState = null
-        }
-        tabs.retainAll { it === keep }
-        activeIndex = 0
-        onChanged()
+    /**
+     * Reclaim the memory of every background tab **without losing them**.
+     *
+     * This is what a low-memory warning should do: the renderer processes go
+     * away, but each tab keeps its saved state and reappears in the tab list,
+     * so pressure on a 1.7 GB box never silently eats the user's open pages.
+     */
+    fun freezeAllButActive(): Int {
+        val victims = tabs.filter { it !== active && it.isLive }
+        victims.forEach { freeze(it) }
+        if (victims.isNotEmpty()) onChanged()
+        return victims.size
     }
 
     /** Persist the live tab's scroll/navigation state before the app is backgrounded. */
@@ -137,8 +142,10 @@ class TabManager(
         val tab = active ?: return
         val wv = tab.webView ?: return
         val b = Bundle()
-        wv.saveState(b)
-        tab.savedState = b
+        if (wv.saveState(b) != null) {
+            tab.savedState = b
+            tab.url = wv.url ?: tab.url
+        }
     }
 
     fun destroyAll() {
@@ -162,7 +169,12 @@ class TabManager(
         if (state != null && wv.restoreState(state) != null) {
             Log.i(TAG, "restored tab ${tab.id}")
         } else {
-            tab.pendingLoad?.let { wv.loadUrl(it) }
+            // Fall back to the tab's URL, not just pendingLoad: pendingLoad is
+            // cleared after the first wake, so a tab whose saved state failed to
+            // restore would otherwise come back as a permanently blank screen
+            // that only retyping the address by remote could recover.
+            val url = tab.pendingLoad ?: tab.url.takeUnless { it == "about:blank" }
+            url?.let { wv.loadUrl(it) }
         }
         tab.pendingLoad = null
         return wv
@@ -214,10 +226,14 @@ class TabManager(
 
     private fun freeze(tab: Tab) {
         val wv = tab.webView ?: return
-        val b = Bundle()
-        wv.saveState(b)
-        tab.savedState = b
+        // Capture the URL before destroying the WebView, so the tab is
+        // reloadable even when there is no usable saved state.
         tab.url = wv.url ?: tab.url
+        val b = Bundle()
+        // saveState returns null (leaving the Bundle empty) when the history is
+        // too large or absent. Keeping that Bundle would make restoreState fail
+        // later with nothing to fall back on, so only keep a real one.
+        tab.savedState = if (wv.saveState(b) != null) b else null
         destroy(wv)
         tab.webView = null
         Log.i(TAG, "froze tab ${tab.id} (${tab.displayTitle})")

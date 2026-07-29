@@ -159,12 +159,18 @@
     document.documentElement.appendChild(overlay);
     document.documentElement.style.overflow = 'hidden';
     overlay.scrollTop = 0;
+    // Confine spatial navigation to the overlay. The page beneath is only
+    // covered, not hidden, so without this the D-pad would keep finding its
+    // links — focusing things the user cannot see and scrolling a document we
+    // just pinned.
+    window.__ORBIT_READER_ROOT__ = overlay;
     return true;
   }
 
   function teardown() {
     if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
     overlay = null;
+    window.__ORBIT_READER_ROOT__ = null;
     document.documentElement.style.overflow = '';
   }
 
@@ -178,9 +184,12 @@
       }
       if (!build()) return JSON.stringify({ result: 'unavailable' });
       this.active = true;
-      // Reader content is plain text, so spatial navigation has little to grab;
-      // scrolling is what matters here.
-      if (window.__ORBIT__) window.__ORBIT__.clear();
+      // Drop any highlight left on the page underneath, then re-enter inside
+      // the overlay so the first arrow press acts on the article.
+      if (window.__ORBIT__) {
+        window.__ORBIT__.clear();
+        window.__ORBIT__.enter();
+      }
       return JSON.stringify({ result: 'on' });
     },
     scrollBy: function (dy) {
