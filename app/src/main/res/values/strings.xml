@@ -3,6 +3,10 @@
     <string name="app_name">Orbit</string>
 
     <string name="omnibox_hint">Search or enter address</string>
+    <string name="add_shortcut_hint">Enter a website to pin to the start page</string>
+    <string name="shortcut_added">Pinned to the start page</string>
+    <string name="shortcut_exists">That site is already pinned</string>
+    <string name="shortcut_moved">Moved earlier</string>
     <string name="cd_back">Back</string>
     <string name="cd_forward">Forward</string>
     <string name="cd_reload">Reload</string>

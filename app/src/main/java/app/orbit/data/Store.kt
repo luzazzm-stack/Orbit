@@ -97,10 +97,25 @@ object Store {
         return added
     }
 
+    /**
+     * Add without toggling. Used by "Add shortcut", where re-entering a site you
+     * already pinned should be a no-op rather than silently unpinning it.
+     *
+     * @return false when it was already there.
+     */
+    @Synchronized
+    fun addBookmark(url: String, title: String): Boolean {
+        if (_bookmarks.any { it.url == url }) return false
+        _bookmarks.add(0, SiteEntry(url, title.ifBlank { url }))
+        write(bookmarksFile, _bookmarks)
+        return true
+    }
+
     @Synchronized
     fun removeBookmark(url: String) {
         if (_bookmarks.removeAll { it.url == url }) write(bookmarksFile, _bookmarks)
     }
+
 
     @Synchronized
     fun addHistory(url: String, title: String) {

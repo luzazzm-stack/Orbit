@@ -181,6 +181,32 @@
     transform:scale(1.045);
   }
 
+  /* "Add shortcut" reads as an affordance, not a site: dashed, no badge fill. */
+  .tile-add{
+    background:transparent;
+    border-style:dashed;
+  }
+  .tile-add .badge{
+    background:transparent;
+    border:2px dashed var(--line);
+    color:var(--muted);
+    font-size:26px;
+    font-weight:400;
+  }
+  .tile-add .name{color:var(--muted);font-weight:500}
+  .tile-add.__orbit-focus,
+  .tile-add:focus{
+    border-style:solid;
+    background:var(--surface-2);
+  }
+  .tile-add.__orbit-focus .badge,
+  .tile-add:focus .badge{
+    border-color:var(--accent);
+    color:var(--accent);
+  }
+  .tile-add.__orbit-focus .name,
+  .tile-add:focus .name{color:var(--text)}
+
   .empty{
     grid-column:1 / -1;
     padding:34px;
@@ -281,17 +307,40 @@
     var grid = document.getElementById('tiles');
     grid.innerHTML = '';
 
+    // The last tile is always "Add shortcut", so pinning a site never requires
+    // visiting it first or hunting through a menu.
+    function addAddTile() {
+      var a = document.createElement('a');
+      a.className = 'tile tile-add';
+      // Intercepted natively; see handleOrbitCommand in BrowserActivity.
+      a.href = 'orbit://add-shortcut';
+
+      var badge = document.createElement('div');
+      badge.className = 'badge';
+      badge.textContent = '+';
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+      var n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = 'Add shortcut';
+      var h = document.createElement('div');
+      h.className = 'host';
+      h.textContent = 'Pin any site here';
+
+      meta.appendChild(n);
+      meta.appendChild(h);
+      a.appendChild(badge);
+      a.appendChild(meta);
+      grid.appendChild(a);
+    }
+
     if (!data.sites || !data.sites.length) {
-      var e = document.createElement('div');
-      e.className = 'empty';
-      e.textContent = 'No shortcuts yet — search above, then bookmark a page.';
-      grid.appendChild(e);
+      addAddTile();
       return;
     }
 
-    // Six tiles = two clean rows of three, which is what fits above the fold
-    // once the toolbar's reserved space is taken out.
-    data.sites.slice(0, 6).forEach(function (site) {
+    data.sites.slice(0, 8).forEach(function (site) {
       var host = hostOf(site.url);
       var name = site.title || host;
 
@@ -338,6 +387,8 @@
       a.appendChild(meta);
       grid.appendChild(a);
     });
+
+    addAddTile();
   }
 
   function clock() {

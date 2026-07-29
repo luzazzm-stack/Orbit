@@ -62,6 +62,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     private var hadPrivateTabs = false
     private var restoreToolbarAfterPanel = false
 
+    /** True while the address bar is being used to pin a site, not to navigate. */
+    private var addingShortcut = false
+
     private val hideToolbarTask = Runnable { hideToolbar() }
     private val hideToastTask = Runnable { b.toast.visibility = View.GONE }
 
@@ -187,6 +190,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 request: WebResourceRequest
             ): Boolean {
                 val url = request.url?.toString() ?: return false
+                if (handleOrbitCommand(url)) return true
                 // Subframes must never be able to steer the top-level frame.
                 // loadUrl() always targets the top frame, so upgrading an http
                 // iframe here would let that iframe replace the whole page.
@@ -197,6 +201,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
             @Deprecated("Kept for API < 24 devices")
             override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                if (handleOrbitCommand(url)) return true
                 // The string overload is only called on API < 24, where the
                 // frame cannot be identified; this app's minSdk-21 devices are
                 // not the target hardware, so keep the simple behaviour.
@@ -359,9 +364,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     private fun injectHomeData(wv: WebView, allowIconFetch: Boolean = true) {
         // Map.putIfAbsent is API 24; minSdk here is 21, so do it the long way.
         val entries = LinkedHashMap<String, app.orbit.data.SiteEntry>()
-        Store.bookmarks.take(6).forEach { if (!entries.containsKey(it.url)) entries[it.url] = it }
-        Store.topSites(6).forEach {
-            if (entries.size < 6 && !entries.containsKey(it.url)) entries[it.url] = it
+        Store.bookmarks.take(8).forEach { if (!entries.containsKey(it.url)) entries[it.url] = it }
+        Store.topSites(8).forEach {
+            if (entries.size < 8 && !entries.containsKey(it.url)) entries[it.url] = it
         }
 
         val sites = JSONArray()
@@ -402,6 +407,20 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 }
             }
         }
+    }
+
+    /**
+     * Private scheme the start page uses to call back into the app.
+     *
+     * The start page has no JavaScript bridge by design, so a plain link is how
+     * it asks for something — the URL never leaves the WebView.
+     */
+    private fun handleOrbitCommand(url: String): Boolean {
+        if (!url.startsWith("orbit://")) return false
+        when (url.removePrefix("orbit://").substringBefore('?')) {
+            "add-shortcut" -> beginAddShortcut()
+        }
+        return true
     }
 
     /** HTTPS-only mode: retry plain http navigations over TLS instead. */
@@ -537,13 +556,58 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 actionId == EditorInfo.IME_ACTION_SEARCH ||
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER &&
                     event.action == KeyEvent.ACTION_DOWN)
-            if (go) {
-                navigate(UrlUtils.toUrlOrSearch(v.text.toString()))
-                hideKeyboard()
-                hideToolbar()
-                true
-            } else false
+            if (!go) return@setOnEditorActionListener false
+
+            val typed = v.text.toString().trim()
+            if (addingShortcut) {
+                commitShortcut(typed)
+            } else {
+                navigate(UrlUtils.toUrlOrSearch(typed))
+            }
+            hideKeyboard()
+            hideToolbar()
+            true
         }
+    }
+
+    // --------------------------------------------------------- add a shortcut
+
+    /**
+     * Reuses the address bar rather than adding a second text field: entering
+     * text on a TV remote is painful enough without two different ways to do it.
+     */
+    private fun beginAddShortcut() {
+        addingShortcut = true
+        showToolbar(focus = false)
+        b.omnibox.setHint(R.string.add_shortcut_hint)
+        b.omnibox.setText("")
+        b.omnibox.post {
+            b.omnibox.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(b.omnibox, InputMethodManager.SHOW_IMPLICIT)
+        }
+        cancelToolbarAutoHide()
+    }
+
+    private fun commitShortcut(typed: String) {
+        endAddShortcut()
+        if (typed.isEmpty()) return
+        val url = UrlUtils.toUrlOrSearch(typed)
+        val name = UrlUtils.prettyHost(url).ifBlank { typed }
+        val added = Store.addBookmark(url, name)
+        toast(getString(if (added) R.string.shortcut_added else R.string.shortcut_exists))
+        // Re-render the start page so the new tile appears immediately, and warm
+        // its icon so the tile is not a bare monogram for the first visit.
+        tabs.activeWebView?.let { wv ->
+            if (UrlUtils.isHome(wv.url)) injectHomeData(wv) else navigate(UrlUtils.HOME_URL)
+        }
+    }
+
+    private fun endAddShortcut() {
+        if (!addingShortcut) return
+        addingShortcut = false
+        b.omnibox.setHint(R.string.omnibox_hint)
+        b.omnibox.setText("")
     }
 
     // ------------------------------------------------------------ find in page
@@ -644,7 +708,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private fun setOmniboxText(url: String?) {
         // Never overwrite what the user is in the middle of typing.
-        if (b.omnibox.hasFocus()) return
+        if (b.omnibox.hasFocus() || addingShortcut) return
         b.omnibox.setText(
             when {
                 url == null -> ""
@@ -662,6 +726,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private fun hideToolbar() {
         cancelToolbarAutoHide()
+        endAddShortcut()
         if (b.toolbar.visibility != View.VISIBLE) return
         hideKeyboard()
         b.toolbar.visibility = View.GONE
@@ -1172,6 +1237,8 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             toast("No downloads app on this device")
         }
     }
+
+    override fun onAddShortcut() = beginAddShortcut()
 
     override fun isPrivate(): Boolean = tabs.active?.isPrivate == true
 

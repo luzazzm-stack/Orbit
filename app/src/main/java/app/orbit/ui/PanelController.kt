@@ -38,6 +38,7 @@ class PanelController(
         fun onNewPrivateTab()
         fun onClearCookiesAndCache()
         fun onOpenSystemDownloads()
+        fun onAddShortcut()
         fun isPrivate(): Boolean
     }
 
@@ -126,6 +127,10 @@ class PanelController(
                     if (tabs.newTab() == null) cb.toast(str(R.string.tab_limit)) else close()
                 },
                 "Private tab" to { cb.onNewPrivateTab(); close() }
+            )
+            Section.BOOKMARKS -> footer(
+                "Add shortcut" to { close(); cb.onAddShortcut() },
+                null
             )
             Section.HISTORY -> footer(
                 null,
