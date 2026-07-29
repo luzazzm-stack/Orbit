@@ -310,13 +310,13 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         val sites = JSONArray()
         val seen = HashSet<String>()
 
-        Store.bookmarks.forEach { entry ->
+        Store.bookmarks.take(6).forEach { entry ->
             if (seen.add(entry.url)) {
                 sites.put(JSONObject().put("title", entry.title).put("url", entry.url))
             }
         }
-        Store.topSites(8).forEach { entry ->
-            if (sites.length() >= 8) return@forEach
+        Store.topSites(6).forEach { entry ->
+            if (sites.length() >= 6) return@forEach
             if (seen.add(entry.url)) {
                 sites.put(JSONObject().put("title", entry.title).put("url", entry.url))
             }

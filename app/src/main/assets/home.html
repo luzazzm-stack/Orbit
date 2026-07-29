@@ -28,22 +28,23 @@
     color:var(--text);
     font-family:"Roboto","Noto Sans",-apple-system,system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    /* 5vw/5vh is the TV overscan inset. The larger top value additionally
-       clears the app's toolbar, which stays pinned over the start page. */
-    padding:118px 5vw 5vh;
+    /* Deliberately NOT flex-centred. When content is taller than the viewport,
+       centring overflows equally at both ends and pushes the header up *behind*
+       the toolbar. Normal block flow honours padding-top unconditionally. */
+    display:block;
+    /* 5vw/5vh is the TV overscan inset; the larger top value additionally
+       clears the app toolbar, which stays pinned over the start page. */
+    padding:104px 5vw 5vh;
     overflow-x:hidden;
   }
 
-  .wrap{width:100%;max-width:1180px;min-width:0}
+  .wrap{width:100%;max-width:1180px;min-width:0;margin:0 auto}
 
   header{
     display:flex;
     align-items:center;
     justify-content:space-between;
-    margin-bottom:44px;
+    margin-bottom:30px;
   }
 
   .brand{display:flex;align-items:center;gap:16px}
@@ -65,7 +66,7 @@
 
   /* ---------------------------------------------------------- search */
 
-  .search{position:relative;margin-bottom:52px}
+  .search{position:relative;margin-bottom:34px}
 
   .search svg{
     position:absolute;
@@ -80,9 +81,9 @@
 
   #q{
     width:100%;
-    height:82px;
+    height:72px;
     padding:0 32px 0 72px;
-    font-size:23px;
+    font-size:22px;
     font-family:inherit;
     color:var(--text);
     background:var(--surface);
@@ -103,24 +104,26 @@
     text-transform:uppercase;
     color:var(--muted);
     font-weight:700;
-    margin-bottom:18px;
+    margin-bottom:14px;
   }
 
   .grid{
     display:grid;
-    /* minmax(0,1fr), not 1fr: grid items default to min-width:auto, so a long
-       unbreakable title would otherwise widen its track and push the whole
-       grid off the right of the screen. */
-    grid-template-columns:repeat(4,minmax(0,1fr));
-    gap:20px;
+    /* Three columns, not four: at TV type sizes a quarter-width tile leaves
+       ~90px for the label, which truncates "YouTube TV" to "YouTub…".
+       minmax(0,1fr) rather than 1fr because grid items default to
+       min-width:auto, so a long title would otherwise widen its own track and
+       push the whole grid off the right edge. */
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    gap:18px;
   }
 
   .tile{
     display:flex;
     align-items:center;
-    gap:16px;
+    gap:15px;
     min-width:0;
-    padding:20px;
+    padding:16px;
     background:var(--surface);
     border:1px solid var(--line);
     border-radius:var(--radius);
@@ -135,8 +138,8 @@
 
   .badge{
     flex:0 0 auto;
-    width:52px;height:52px;
-    border-radius:14px;
+    width:48px;height:48px;
+    border-radius:13px;
     display:grid;
     place-items:center;
     font-size:23px;
@@ -184,7 +187,7 @@
   /* ---------------------------------------------------------- footer */
 
   .hints{
-    margin-top:52px;
+    margin-top:32px;
     display:flex;
     flex-wrap:wrap;
     gap:12px 26px;
@@ -205,8 +208,8 @@
     color:var(--text);
   }
 
-  @media (max-width:900px){
-    .grid{grid-template-columns:repeat(2,1fr)}
+  @media (max-width:820px){
+    .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   }
 </style>
 </head>
@@ -288,7 +291,9 @@
       return;
     }
 
-    data.sites.slice(0, 8).forEach(function (site) {
+    // Six tiles = two clean rows of three, which is what fits above the fold
+    // once the toolbar's reserved space is taken out.
+    data.sites.slice(0, 6).forEach(function (site) {
       var host = hostOf(site.url);
       var name = site.title || host;
 

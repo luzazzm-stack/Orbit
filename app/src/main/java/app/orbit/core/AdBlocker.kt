@@ -57,7 +57,9 @@ object AdBlocker {
         if (app.orbit.data.Prefs.adBlock && inLocalList(host)) return true
 
         if (app.orbit.data.Prefs.doh && !isMainFrame) {
-            return DohResolver.check(host, DOH_TIMEOUT_MS) == DohResolver.Verdict.BLOCK
+            val blocked = DohResolver.check(host, DOH_TIMEOUT_MS) == DohResolver.Verdict.BLOCK
+            if (blocked) Log.d(TAG, "DNS blocked $host")
+            return blocked
         }
         return false
     }
