@@ -60,6 +60,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     private var centerLongFired = false
     private var lastBackAt = 0L
     private var hadPrivateTabs = false
+    private var restoreToolbarAfterPanel = false
 
     private val hideToolbarTask = Runnable { hideToolbar() }
     private val hideToastTask = Runnable { b.toast.visibility = View.GONE }
@@ -196,6 +197,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             override fun onPageFinished(view: WebView, url: String) {
                 b.progress.visibility = View.GONE
                 spatial.inject(view)
+                if (!UrlUtils.isHome(url)) maybeAutoPointer(view)
                 if (UrlUtils.isHome(url)) {
                     injectHomeData(view)
                     // Give the start page a visible selection straight away so
@@ -645,6 +647,39 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         }
     }
 
+    private fun enablePointer(message: String?) {
+        if (!cursor.enabled) {
+            cursor.enable(b.cursorHost)
+            tabs.activeWebView?.let { spatial.clear(it) }
+        }
+        tabs.active?.cursorMode = true
+        b.btnCursor.isSelected = true
+        message?.let { toast(it) }
+    }
+
+    /**
+     * Some sites simply cannot be driven by a D-pad: a canvas app, an embedded
+     * player, or a page whose content lives in a cross-origin frame exposes
+     * nothing to move between. Rather than leaving the user stuck, hand them a
+     * pointer automatically.
+     */
+    private fun maybeAutoPointer(wv: WebView) {
+        when (Prefs.pointerOnSites) {
+            "never" -> return
+            "always" -> enablePointer(null)
+            else -> wv.postDelayed({
+                if (wv !== tabs.activeWebView || cursor.enabled || panel.isOpen) {
+                    return@postDelayed
+                }
+                spatial.probe(wv) { probe ->
+                    if (probe != null && probe.needsPointer && !cursor.enabled) {
+                        enablePointer("Pointer mode — this site has little to select")
+                    }
+                }
+            }, AUTO_POINTER_DELAY)
+        }
+    }
+
     private fun toggleBookmark() {
         val tab = tabs.active ?: return
         if (UrlUtils.isHome(tab.url)) return
@@ -850,12 +885,26 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 } else {
                     ui.removeCallbacks(longCenterTask)
                     if (!centerLongFired) {
-                        spatial.activate(wv) { outcome ->
-                            if (outcome == SpatialNav.Outcome.INPUT) {
-                                wv.requestFocus()
-                                val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
-                                    as InputMethodManager
-                                imm.showSoftInput(wv, InputMethodManager.SHOW_IMPLICIT)
+                        spatial.activate(wv) { outcome, data ->
+                            when (outcome) {
+                                SpatialNav.Outcome.INPUT -> {
+                                    wv.requestFocus()
+                                    val imm = getSystemService(Context.INPUT_METHOD_SERVICE)
+                                        as InputMethodManager
+                                    imm.showSoftInput(wv, InputMethodManager.SHOW_IMPLICIT)
+                                }
+                                // A captcha and friends live in a cross-origin
+                                // frame we are not allowed to script. Drop a real
+                                // pointer onto it instead of doing nothing.
+                                SpatialNav.Outcome.IFRAME -> {
+                                    val cx = (data?.optDouble("cxRatio", 0.5) ?: 0.5)
+                                        .toFloat() * b.cursorHost.width
+                                    val cy = (data?.optDouble("cyRatio", 0.5) ?: 0.5)
+                                        .toFloat() * b.cursorHost.height
+                                    enablePointer("Pointer mode — press OK to click inside")
+                                    cursor.placeAt(cx, cy)
+                                }
+                                else -> Unit
                             }
                         }
                     }
@@ -895,17 +944,44 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     // ------------------------------------------------- PanelController callbacks
 
+    /**
+     * Opening the panel makes it a focus trap.
+     *
+     * Without this the page and toolbar behind the panel stay focusable, and
+     * because they are siblings in the root layout, D-pad focus search escapes
+     * straight out of the panel onto whatever is geometrically nearest — which
+     * looked like "DOWN does nothing" and "UP jumps back to the page".
+     */
     private fun openPanel(section: PanelController.Section) {
         cancelToolbarAutoHide()
+        restoreToolbarAfterPanel = toolbarVisible
+        // Set directly rather than via hideToolbar(), which hands focus back to
+        // the page — the very thing we are about to block.
+        b.toolbar.visibility = View.GONE
+        hideKeyboard()
+        setPageFocusable(false)
         b.scrim.visibility = View.VISIBLE
         panel.open(section)
+    }
+
+    private fun setPageFocusable(on: Boolean) {
+        b.webContainer.descendantFocusability =
+            if (on) ViewGroup.FOCUS_AFTER_DESCENDANTS else ViewGroup.FOCUS_BLOCK_DESCENDANTS
     }
 
     override fun openUrl(url: String) = navigate(url)
 
     override fun onPanelClosed() {
         b.scrim.visibility = View.GONE
-        tabs.activeWebView?.requestFocus()
+        setPageFocusable(true)
+        if (restoreToolbarAfterPanel) {
+            // Put the user back on the button they opened the panel from.
+            b.toolbar.visibility = View.VISIBLE
+            b.btnMenu.post { b.btnMenu.requestFocus() }
+            scheduleToolbarAutoHide()
+        } else {
+            tabs.activeWebView?.requestFocus()
+        }
     }
 
     override fun toast(message: String) {
@@ -965,5 +1041,8 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         // it vanish, and the next keypress then went to the page instead.
         private const val TOOLBAR_TIMEOUT = 12000L
         private const val LONG_PRESS_MS = 600L
+
+        /** Let late scripts and lazy content settle before judging navigability. */
+        private const val AUTO_POINTER_DELAY = 900L
     }
 }

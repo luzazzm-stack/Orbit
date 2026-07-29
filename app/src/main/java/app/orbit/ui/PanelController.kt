@@ -323,10 +323,16 @@ class PanelController(
             }
         )
         out += PanelItem.Row(
-            title = "Start pages in pointer mode",
+            title = "Pointer on websites",
+            subtitle = "Automatic turns it on when a site can't be driven by the D-pad",
             iconRes = R.drawable.ic_cursor,
-            value = onOff(Prefs.defaultCursorMode),
-            onClick = { Prefs.defaultCursorMode = !Prefs.defaultCursorMode; refresh() }
+            value = Prefs.pointerModeLabel,
+            onClick = {
+                val modes = listOf("auto", "always", "never")
+                Prefs.pointerOnSites =
+                    modes[(modes.indexOf(Prefs.pointerOnSites).coerceAtLeast(0) + 1) % modes.size]
+                refresh()
+            }
         )
         out += PanelItem.Row(
             title = "Smooth scrolling",

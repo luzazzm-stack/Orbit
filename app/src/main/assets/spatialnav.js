@@ -23,6 +23,10 @@
     'a[href]', 'button', 'select', 'textarea', 'summary', 'details',
     'input:not([type="hidden"])',
     'video', 'audio', 'area[href]',
+    // Iframes are included so things like a reCAPTCHA checkbox become a focus
+    // stop. Their contents are cross-origin and cannot be scripted from here,
+    // so activating one hands over to the pointer instead.
+    'iframe',
     '[tabindex]:not([tabindex="-1"])',
     '[onclick]', '[role="button"]', '[role="link"]', '[role="tab"]',
     '[role="menuitem"]', '[role="menuitemcheckbox"]', '[role="menuitemradio"]',
@@ -293,6 +297,17 @@
     var r = rectOf(el);
     var x = Math.round(r.cx), y = Math.round(r.cy);
 
+    // Cross-origin frame: same-origin policy means we cannot click inside it,
+    // and a captcha is the common case. Report its centre as a fraction of the
+    // viewport so the app can drop a real pointer onto it.
+    if ((el.tagName || '').toLowerCase() === 'iframe') {
+      return {
+        result: 'iframe',
+        cxRatio: r.cx / (vw() || 1),
+        cyRatio: r.cy / (vh() || 1)
+      };
+    }
+
     if (isTextEntry(el)) {
       try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) {} }
       return { result: 'input' };
@@ -386,6 +401,34 @@
     } catch (e) { return { result: 'error' }; }
   }
 
+  /**
+   * How navigable is this page with a D-pad?
+   *
+   * Pages built as a single canvas, map or cross-origin frame expose almost
+   * nothing to move between, and on those the pointer is the only sane input.
+   * The app calls this after load to decide automatically.
+   */
+  function probe() {
+    var list = candidates();
+    var inView = 0;
+    for (var i = 0; i < list.length; i++) {
+      var r = rectOf(list[i]);
+      if (r.bottom > 0 && r.top < vh() && r.right > 0 && r.left < vw()) inView++;
+    }
+
+    var big = 0;
+    var area = (vw() * vh()) || 1;
+    var frames = [];
+    try {
+      frames = document.querySelectorAll('iframe,canvas,embed,object');
+    } catch (e) {}
+    for (var j = 0; j < frames.length; j++) {
+      var fr = rectOf(frames[j]);
+      if ((fr.width * fr.height) / area > 0.3) big++;
+    }
+    return { result: 'probe', count: inView, big: big };
+  }
+
   function rescan() {
     injectStyle();
     if (current && (!document.contains(current) || !isVisible(current))) unmark();
@@ -396,6 +439,7 @@
     move: function (d) { return JSON.stringify(move(d)); },
     activate: function () { return JSON.stringify(activate()); },
     info: function () { return JSON.stringify(info()); },
+    probe: function () { return JSON.stringify(probe()); },
     playPause: function () { return JSON.stringify(playPause()); },
     seek: function (d) { return JSON.stringify(seek(d)); },
     clear: function () { unmark(); return '{}'; },

@@ -82,6 +82,23 @@ class CursorController(
         return enabled
     }
 
+    /**
+     * Park the pointer on a specific point and let the page know it is hovering
+     * there, so whatever is underneath lights up immediately. Used when a
+     * cross-origin frame (a captcha, typically) needs a real pointer.
+     */
+    fun placeAt(x: Float, y: Float) {
+        if (!enabled) return
+        val w = overlay.width.toFloat()
+        val h = overlay.height.toFloat()
+        if (w <= 0f || h <= 0f) {
+            overlay.post { placeAt(x, y) }
+            return
+        }
+        overlay.moveTo(x.coerceIn(2f, w - 2f), y.coerceIn(2f, h - 2f))
+        sendHover(MotionEvent.ACTION_HOVER_MOVE)
+    }
+
     // ------------------------------------------------------------ key events
 
     /** @return true when the event was consumed. */

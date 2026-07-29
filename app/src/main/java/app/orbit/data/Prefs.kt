@@ -19,7 +19,9 @@ object Prefs {
     private const val K_START_MODE = "start_mode"
     private const val K_HOME_URL = "home_url"
     private const val K_SMOOTH_SCROLL = "smooth_scroll"
-    private const val K_DEFAULT_CURSOR = "default_cursor"
+    // New key on purpose: "default_cursor" was stored as a Boolean in 0.2.x, and
+    // reading an existing Boolean with getString throws ClassCastException.
+    private const val K_DEFAULT_CURSOR = "pointer_on_sites"
     private const val K_DOH = "doh_enabled"
     private const val K_DOH_URL = "doh_url"
     private const val K_IMAGES = "load_images"
@@ -77,10 +79,24 @@ object Prefs {
         get() = sp.getBoolean(K_SMOOTH_SCROLL, true)
         set(v) = sp.edit().putBoolean(K_SMOOTH_SCROLL, v).apply()
 
-    /** When true a new tab starts in cursor mode instead of spatial-nav mode. */
-    var defaultCursorMode: Boolean
-        get() = sp.getBoolean(K_DEFAULT_CURSOR, false)
-        set(v) = sp.edit().putBoolean(K_DEFAULT_CURSOR, v).apply()
+    /**
+     * When the pointer should appear on a website.
+     *
+     * "auto"   — whenever the page has too little for the D-pad to move between
+     *            (canvas apps, embedded players, content inside a frame)
+     * "always" — on every site
+     * "never"  — link mode only; hold OK to reach the pointer manually
+     */
+    var pointerOnSites: String
+        get() = sp.getString(K_DEFAULT_CURSOR, "auto") ?: "auto"
+        set(v) = sp.edit().putString(K_DEFAULT_CURSOR, v).apply()
+
+    val pointerModeLabel: String
+        get() = when (pointerOnSites) {
+            "always" -> "Always"
+            "never" -> "Never"
+            else -> "Automatic"
+        }
 
     /**
      * DNS-over-HTTPS filtering. See DohResolver: AdGuard's answer is used as a

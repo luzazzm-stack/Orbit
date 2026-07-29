@@ -29,7 +29,16 @@ class SpatialNav(private val ctx: Context) {
     }
 
     /** What the page did with the key. */
-    enum class Outcome { MOVED, ENTERED, SCROLLED, EDGE, CLICKED, INPUT, NONE, ERROR }
+    enum class Outcome { MOVED, ENTERED, SCROLLED, EDGE, CLICKED, INPUT, IFRAME, NONE, ERROR }
+
+    /** Result of asking the page how navigable it is with a D-pad. */
+    data class Probe(val focusableInView: Int, val bigFrames: Int) {
+        /**
+         * True for canvas apps, embedded players and pages whose content lives
+         * in a cross-origin frame — nothing for the D-pad to move between.
+         */
+        val needsPointer: Boolean get() = bigFrames > 0 || focusableInView < 6
+    }
 
     private val script: String by lazy {
         try {
@@ -51,8 +60,26 @@ class SpatialNav(private val ctx: Context) {
         eval(wv, "window.__ORBIT__ && window.__ORBIT__.move('$direction')", cb)
     }
 
-    fun activate(wv: WebView, cb: (Outcome) -> Unit) {
-        eval(wv, "window.__ORBIT__ && window.__ORBIT__.activate()", cb)
+    /**
+     * @param cb receives the outcome plus the raw payload, which carries the
+     *           frame's centre (as a fraction of the viewport) for IFRAME.
+     */
+    fun activate(wv: WebView, cb: (Outcome, JSONObject?) -> Unit) {
+        wv.evaluateJavascript("window.__ORBIT__ && window.__ORBIT__.activate()") { raw ->
+            val o = parse(raw)
+            cb(outcomeOf(o), o)
+        }
+    }
+
+    /** Ask the page whether the D-pad has anything to work with. */
+    fun probe(wv: WebView, cb: (Probe?) -> Unit) {
+        wv.evaluateJavascript("window.__ORBIT__ && window.__ORBIT__.probe()") { raw ->
+            val o = parse(raw)
+            cb(
+                if (o == null) null
+                else Probe(o.optInt("count", 0), o.optInt("big", 0))
+            )
+        }
     }
 
     fun enter(wv: WebView, cb: (Outcome) -> Unit = {}) {
@@ -79,25 +106,22 @@ class SpatialNav(private val ctx: Context) {
     }
 
     private fun eval(wv: WebView, js: String, cb: (Outcome) -> Unit) {
-        wv.evaluateJavascript(js) { raw ->
-            val o = parse(raw)
-            if (o == null) {
-                cb(Outcome.ERROR)
-                return@evaluateJavascript
-            }
-            cb(
-                when (o.optString("result")) {
-                    "moved" -> Outcome.MOVED
-                    "entered" -> Outcome.ENTERED
-                    "scrolled" -> Outcome.SCROLLED
-                    "edge" -> Outcome.EDGE
-                    "clicked" -> Outcome.CLICKED
-                    "input" -> Outcome.INPUT
-                    "playing", "paused", "seeked" -> Outcome.CLICKED
-                    "none" -> Outcome.NONE
-                    else -> Outcome.ERROR
-                }
-            )
+        wv.evaluateJavascript(js) { raw -> cb(outcomeOf(parse(raw))) }
+    }
+
+    private fun outcomeOf(o: JSONObject?): Outcome {
+        if (o == null) return Outcome.ERROR
+        return when (o.optString("result")) {
+            "moved" -> Outcome.MOVED
+            "entered" -> Outcome.ENTERED
+            "scrolled" -> Outcome.SCROLLED
+            "edge" -> Outcome.EDGE
+            "clicked" -> Outcome.CLICKED
+            "input" -> Outcome.INPUT
+            "iframe" -> Outcome.IFRAME
+            "playing", "paused", "seeked" -> Outcome.CLICKED
+            "none" -> Outcome.NONE
+            else -> Outcome.ERROR
         }
     }
 
