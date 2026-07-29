@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit</title>
+<style>
+  :root{
+    --canvas:#0A0C10;
+    --surface:#151A21;
+    --surface-2:#1C222B;
+    --line:#2A313C;
+    --text:#E8ECF2;
+    --muted:#9AA4B2;
+    --accent:#6AA6FF;
+    --radius:18px;
+  }
+
+  *{box-sizing:border-box;margin:0;padding:0}
+
+  html,body{height:100%}
+
+  body{
+    background:
+      radial-gradient(1100px 620px at 50% -18%, rgba(106,166,255,.16), transparent 62%),
+      radial-gradient(760px 460px at 92% 108%, rgba(91,214,165,.09), transparent 60%),
+      var(--canvas);
+    color:var(--text);
+    font-family:"Roboto","Noto Sans",-apple-system,system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    /* 5% inset keeps everything clear of TV overscan cropping. */
+    padding:5vh 5vw;
+  }
+
+  .wrap{width:100%;max-width:1180px}
+
+  header{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:44px;
+  }
+
+  .brand{display:flex;align-items:center;gap:16px}
+  .brand svg{width:44px;height:44px;display:block}
+  .brand h1{
+    font-size:27px;
+    font-weight:700;
+    letter-spacing:.13em;
+    text-transform:uppercase;
+  }
+
+  .clock{
+    font-size:26px;
+    font-weight:300;
+    color:var(--muted);
+    font-variant-numeric:tabular-nums;
+    letter-spacing:.02em;
+  }
+
+  /* ---------------------------------------------------------- search */
+
+  .search{position:relative;margin-bottom:52px}
+
+  .search svg{
+    position:absolute;
+    left:28px;
+    top:50%;
+    transform:translateY(-50%);
+    width:26px;height:26px;
+    fill:var(--muted);
+    pointer-events:none;
+    transition:fill .18s ease;
+  }
+
+  #q{
+    width:100%;
+    height:82px;
+    padding:0 32px 0 72px;
+    font-size:23px;
+    font-family:inherit;
+    color:var(--text);
+    background:var(--surface);
+    border:2px solid var(--line);
+    border-radius:44px;
+    outline:none;
+    transition:border-color .18s ease, background .18s ease;
+  }
+  #q::placeholder{color:var(--muted)}
+  #q:focus{border-color:var(--accent);background:var(--surface-2)}
+  .search:focus-within svg{fill:var(--accent)}
+
+  /* ---------------------------------------------------------- tiles */
+
+  .section-label{
+    font-size:13px;
+    letter-spacing:.16em;
+    text-transform:uppercase;
+    color:var(--muted);
+    font-weight:700;
+    margin-bottom:18px;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(4,1fr);
+    gap:20px;
+  }
+
+  .tile{
+    display:flex;
+    align-items:center;
+    gap:16px;
+    padding:20px;
+    background:var(--surface);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    text-decoration:none;
+    color:inherit;
+    outline:none;
+    /* Only transform is animated: this box has no discrete GPU, so anything
+       that triggers layout or paint on every frame visibly stutters. */
+    transition:transform .16s ease, background .16s ease, border-color .16s ease;
+    will-change:transform;
+  }
+
+  .badge{
+    flex:0 0 auto;
+    width:52px;height:52px;
+    border-radius:14px;
+    display:grid;
+    place-items:center;
+    font-size:23px;
+    font-weight:700;
+    color:#0A0C10;
+    text-transform:uppercase;
+  }
+
+  .meta{min-width:0}
+  .meta .name{
+    font-size:18px;
+    font-weight:600;
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .meta .host{
+    font-size:14px;
+    color:var(--muted);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    margin-top:3px;
+  }
+
+  /* The native spatial-navigation engine adds .__orbit-focus. Scaling the tile
+     as well as outlining it makes the focused item obvious from a sofa. */
+  .tile.__orbit-focus,
+  .tile:focus{
+    background:var(--surface-2);
+    border-color:var(--accent);
+    transform:scale(1.045);
+  }
+
+  .empty{
+    grid-column:1 / -1;
+    padding:34px;
+    text-align:center;
+    color:var(--muted);
+    border:1px dashed var(--line);
+    border-radius:var(--radius);
+    font-size:17px;
+  }
+
+  /* ---------------------------------------------------------- footer */
+
+  .hints{
+    margin-top:52px;
+    display:flex;
+    flex-wrap:wrap;
+    gap:12px 26px;
+    font-size:14px;
+    color:var(--muted);
+  }
+  .hints span{display:inline-flex;align-items:center;gap:9px}
+  kbd{
+    background:var(--surface-2);
+    border:1px solid var(--line);
+    border-bottom-width:2px;
+    border-radius:7px;
+    padding:3px 9px;
+    font-family:inherit;
+    font-size:12px;
+    font-weight:700;
+    letter-spacing:.06em;
+    color:var(--text);
+  }
+
+  @media (max-width:900px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand">
+        <svg viewBox="0 0 108 108" aria-hidden="true">
+          <g transform="rotate(-28 54 54)">
+            <ellipse cx="54" cy="54" rx="30" ry="16" fill="none" stroke="#6AA6FF" stroke-width="5"/>
+          </g>
+          <circle cx="54" cy="54" r="12" fill="#E8ECF2"/>
+        </svg>
+        <h1>Orbit</h1>
+      </div>
+      <div class="clock" id="clock">--:--</div>
+    </header>
+
+    <div class="search">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M15.5,14h-0.79l-0.28-0.27C15.41,12.59 16,11.11 16,9.5 16,5.91 13.09,3 9.5,3S3,5.91 3,9.5 5.91,16 9.5,16c1.61,0 3.09-0.59 4.23-1.57l0.27,0.28v0.79l5,4.99L20.49,19l-4.99-5zm-6,0C7.01,14 5,11.99 5,9.5S7.01,5 9.5,5 14,7.01 14,9.5 11.99,14 9.5,14z"/>
+      </svg>
+      <input id="q" type="text" autocomplete="off" autocorrect="off" spellcheck="false"
+             placeholder="Search or enter address">
+    </div>
+
+    <div class="section-label" id="tilesLabel">Shortcuts</div>
+    <div class="grid" id="tiles"></div>
+
+    <div class="hints">
+      <span><kbd>OK</kbd> open</span>
+      <span><kbd>Hold OK</kbd> pointer mode</span>
+      <span><kbd>MENU</kbd> toolbar</span>
+      <span><kbd>BACK</kbd> back</span>
+      <span><kbd>▲</kbd> at top of page opens the toolbar</span>
+    </div>
+  </div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Populated by the app after the page loads. Defaults keep the page usable
+  // if it is ever opened without the host (e.g. while designing it).
+  var data = {
+    searchUrl: 'https://www.google.com/search?q=',
+    sites: [
+      { title: 'YouTube', url: 'https://www.youtube.com/tv' },
+      { title: 'Google', url: 'https://www.google.com' },
+      { title: 'Wikipedia', url: 'https://en.wikipedia.org' }
+    ]
+  };
+
+  var PALETTE = [
+    '#6AA6FF', '#5BD6A5', '#F2B45E', '#E58AA8',
+    '#A98BFF', '#4FD0E0', '#F58F6C', '#B6D45E'
+  ];
+
+  function hostOf(url) {
+    try { return new URL(url).hostname.replace(/^www\./, ''); }
+    catch (e) { return url; }
+  }
+
+  function colourFor(seed) {
+    var h = 0;
+    for (var i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+    return PALETTE[h % PALETTE.length];
+  }
+
+  function render() {
+    var grid = document.getElementById('tiles');
+    grid.innerHTML = '';
+
+    if (!data.sites || !data.sites.length) {
+      var e = document.createElement('div');
+      e.className = 'empty';
+      e.textContent = 'No shortcuts yet — search above, then bookmark a page.';
+      grid.appendChild(e);
+      return;
+    }
+
+    data.sites.slice(0, 8).forEach(function (site) {
+      var host = hostOf(site.url);
+      var name = site.title || host;
+
+      var a = document.createElement('a');
+      a.className = 'tile';
+      a.href = site.url;
+
+      var badge = document.createElement('div');
+      badge.className = 'badge';
+      badge.style.background = colourFor(host);
+      badge.textContent = (name.trim()[0] || '?');
+
+      var meta = document.createElement('div');
+      meta.className = 'meta';
+
+      var n = document.createElement('div');
+      n.className = 'name';
+      n.textContent = name;
+
+      var h = document.createElement('div');
+      h.className = 'host';
+      h.textContent = host;
+
+      meta.appendChild(n);
+      meta.appendChild(h);
+      a.appendChild(badge);
+      a.appendChild(meta);
+      grid.appendChild(a);
+    });
+  }
+
+  function clock() {
+    var d = new Date();
+    var hh = String(d.getHours()).padStart(2, '0');
+    var mm = String(d.getMinutes()).padStart(2, '0');
+    document.getElementById('clock').textContent = hh + ':' + mm;
+  }
+
+  var q = document.getElementById('q');
+  q.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Enter' || ev.keyCode === 13) {
+      ev.preventDefault();
+      var v = q.value.trim();
+      if (!v) return;
+      // Anything that parses as a host goes straight there; the rest is a search.
+      var looksLikeUrl = /^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//.test(v) ||
+        (!/\s/.test(v) && /^[^\s]+\.[a-zA-Z]{2,}([/:?#].*)?$/.test(v));
+      location.href = looksLikeUrl
+        ? (/^[a-zA-Z][a-zA-Z0-9+.\-]*:\/\//.test(v) ? v : 'https://' + v)
+        : data.searchUrl + encodeURIComponent(v);
+    }
+  });
+
+  window.orbitInit = function (payload) {
+    if (payload && typeof payload === 'object') {
+      if (payload.searchUrl) data.searchUrl = payload.searchUrl;
+      if (Array.isArray(payload.sites) && payload.sites.length) data.sites = payload.sites;
+    }
+    render();
+  };
+
+  render();
+  clock();
+  setInterval(clock, 20000);
+})();
+</script>
+</body>
+</html>

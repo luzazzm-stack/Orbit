@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Canvas is near-black rather than pure black: on an LCD panel pure black
+         next to bright web content causes visible haloing. -->
+    <color name="canvas">#0A0C10</color>
+    <color name="surface">#161A21</color>
+    <color name="surface_high">#1F242D</color>
+    <color name="surface_line">#2A313C</color>
+
+    <color name="text_primary">#E8ECF2</color>
+    <color name="text_secondary">#9AA4B2</color>
+    <color name="text_inverse">#0A0C10</color>
+
+    <color name="accent">#6AA6FF</color>
+    <color name="accent_dim">#3D6FB8</color>
+    <color name="positive">#5BD6A5</color>
+    <color name="warning">#F2B45E</color>
+
+    <color name="focus_fill">#FFFFFF</color>
+    <color name="focus_pressed">#C9D9F2</color>
+
+    <color name="scrim">#B3000000</color>
+    <color name="transparent">#00000000</color>
+</resources>

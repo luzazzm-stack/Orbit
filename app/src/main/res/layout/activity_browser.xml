@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/canvas">
+
+    <!-- Live tab WebViews are attached here by TabManager. -->
+    <FrameLayout
+        android:id="@+id/webContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:descendantFocusability="afterDescendants" />
+
+    <!-- Virtual pointer sits above the page but takes no focus. -->
+    <FrameLayout
+        android:id="@+id/cursorHost"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:focusable="false" />
+
+    <!-- Dims the page while a panel is open. -->
+    <View
+        android:id="@+id/scrim"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/scrim"
+        android:focusable="false"
+        android:visibility="gone" />
+
+    <LinearLayout
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:background="@drawable/bg_toolbar"
+        android:descendantFocusability="afterDescendants"
+        android:focusable="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/overscan_h"
+        android:paddingTop="@dimen/overscan_v"
+        android:paddingEnd="@dimen/overscan_h"
+        android:paddingBottom="14dp">
+
+        <ImageView
+            android:id="@+id/btnBack"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_back"
+            android:src="@drawable/ic_back" />
+
+        <ImageView
+            android:id="@+id/btnForward"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_forward"
+            android:src="@drawable/ic_forward" />
+
+        <ImageView
+            android:id="@+id/btnReload"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_reload"
+            android:src="@drawable/ic_reload" />
+
+        <ImageView
+            android:id="@+id/btnHome"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_home"
+            android:src="@drawable/ic_home" />
+
+        <EditText
+            android:id="@+id/omnibox"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/omnibox_height"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_omnibox"
+            android:defaultFocusHighlightEnabled="false"
+            android:hint="@string/omnibox_hint"
+            android:imeOptions="actionGo|flagNoExtractUi"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:singleLine="true"
+            android:textColor="@color/tint_row_text"
+            android:textColorHint="@color/tint_row_sub"
+            android:textCursorDrawable="@null"
+            android:textSize="@dimen/text_omnibox"
+            tools:targetApi="o" />
+
+        <ImageView
+            android:id="@+id/btnVoice"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_voice"
+            android:src="@drawable/ic_mic" />
+
+        <ImageView
+            android:id="@+id/btnCursor"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_cursor"
+            android:src="@drawable/ic_cursor" />
+
+        <ImageView
+            android:id="@+id/btnBookmark"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_bookmark"
+            android:src="@drawable/ic_star_off" />
+
+        <TextView
+            android:id="@+id/btnTabs"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:layout_marginStart="6dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_tab_button"
+            android:clickable="true"
+            android:contentDescription="@string/cd_tabs"
+            android:defaultFocusHighlightEnabled="false"
+            android:focusable="true"
+            android:gravity="center"
+            android:text="1"
+            android:textColor="@color/tint_on_focusable"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            tools:targetApi="o" />
+
+        <ImageView
+            android:id="@+id/btnMenu"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_menu"
+            android:src="@drawable/ic_menu" />
+    </LinearLayout>
+
+    <ProgressBar
+        android:id="@+id/progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="4dp"
+        android:layout_gravity="top"
+        android:layout_marginTop="0dp"
+        android:max="100"
+        android:progressDrawable="@drawable/progress_bar"
+        android:visibility="gone" />
+
+    <!-- Side panel: tabs, bookmarks, history, settings. -->
+    <FrameLayout
+        android:id="@+id/panelHost"
+        android:layout_width="@dimen/panel_width"
+        android:layout_height="match_parent"
+        android:layout_gravity="end"
+        android:visibility="gone" />
+
+    <!-- Fullscreen video target for WebChromeClient. -->
+    <FrameLayout
+        android:id="@+id/fullscreenContainer"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/toast"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="56dp"
+        android:background="@drawable/bg_toast"
+        android:elevation="8dp"
+        android:paddingStart="26dp"
+        android:paddingTop="13dp"
+        android:paddingEnd="26dp"
+        android:paddingBottom="13dp"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/text_body"
+        android:visibility="gone"
+        tools:text="Pointer mode on" />
+</FrameLayout>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.Orbit" parent="Theme.MaterialComponents.NoActionBar">
+        <item name="android:windowBackground">@color/canvas</item>
+        <item name="android:colorBackground">@color/canvas</item>
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:windowActionBar">false</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="colorPrimary">@color/accent</item>
+        <item name="colorPrimaryDark">@color/canvas</item>
+        <item name="colorAccent">@color/accent</item>
+        <item name="android:textColorPrimary">@color/text_primary</item>
+        <item name="android:textColorSecondary">@color/text_secondary</item>
+        <item name="android:statusBarColor">@color/canvas</item>
+        <item name="android:navigationBarColor">@color/canvas</item>
+    </style>
+
+    <style name="ToolButton">
+        <item name="android:layout_width">@dimen/tool_button</item>
+        <item name="android:layout_height">@dimen/tool_button</item>
+        <item name="android:background">@drawable/bg_focusable_round</item>
+        <item name="android:padding">13dp</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">@color/tint_on_focusable</item>
+        <item name="android:defaultFocusHighlightEnabled" tools:targetApi="o">false</item>
+    </style>
+
+    <style name="PanelTab">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">44dp</item>
+        <item name="android:background">@drawable/bg_focusable</item>
+        <item name="android:paddingStart">18dp</item>
+        <item name="android:paddingEnd">18dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:textSize">@dimen/text_body</item>
+        <item name="android:textColor">@color/tint_on_focusable</item>
+        <item name="android:defaultFocusHighlightEnabled" tools:targetApi="o">false</item>
+    </style>
+</resources>

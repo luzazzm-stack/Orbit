@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Focus inverts the control: white plate, dark glyph. Unmistakable from
+     across a room, which is the whole point on a TV. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_inverse" android:state_pressed="true" />
+    <item android:color="@color/text_inverse" android:state_focused="true" />
+    <item android:color="@color/text_primary" />
+</selector>

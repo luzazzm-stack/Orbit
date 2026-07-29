@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pre-API-26 launcher icon. Same mark on the app canvas colour. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#0A0C10"
+        android:pathData="M0,0h108v108h-108z" />
+
+    <group
+        android:pivotX="54"
+        android:pivotY="54"
+        android:rotation="-28">
+        <path
+            android:pathData="M54,54 m-30,0 a30,16 0 1,0 60,0 a30,16 0 1,0 -60,0"
+            android:strokeColor="#6AA6FF"
+            android:strokeWidth="6" />
+    </group>
+    <path
+        android:fillColor="#E8ECF2"
+        android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0" />
+</vector>

@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The root is deliberately NOT focusable and uses afterDescendants: a
+     focusable container that wraps focusable children swallows D-pad focus and
+     makes the list feel dead. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:descendantFocusability="afterDescendants"
+    android:focusable="false"
+    android:orientation="horizontal"
+    android:paddingTop="3dp"
+    android:paddingBottom="3dp">
+
+    <LinearLayout
+        android:id="@+id/rowMain"
+        android:layout_width="0dp"
+        android:layout_height="@dimen/row_height"
+        android:layout_weight="1"
+        android:background="@drawable/bg_focusable"
+        android:clickable="true"
+        android:defaultFocusHighlightEnabled="false"
+        android:focusable="true"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        tools:targetApi="o">
+
+        <ImageView
+            android:id="@+id/rowIcon"
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:layout_marginEnd="14dp"
+            android:contentDescription="@null"
+            android:tint="@color/tint_on_focusable"
+            tools:src="@drawable/ic_globe" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:focusable="false"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/rowTitle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/tint_row_text"
+                android:textSize="@dimen/text_body"
+                tools:text="Hacker News" />
+
+            <TextView
+                android:id="@+id/rowSub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="@color/tint_row_sub"
+                android:textSize="@dimen/text_caption"
+                android:visibility="gone"
+                tools:text="news.ycombinator.com" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/rowValue"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="12dp"
+            android:textColor="@color/tint_row_sub"
+            android:textSize="@dimen/text_body"
+            android:visibility="gone"
+            tools:text="On" />
+    </LinearLayout>
+
+    <ImageView
+        android:id="@+id/rowAction"
+        android:layout_width="@dimen/row_height"
+        android:layout_height="@dimen/row_height"
+        android:layout_marginStart="6dp"
+        android:background="@drawable/bg_focusable_round"
+        android:clickable="true"
+        android:contentDescription="@string/cd_close"
+        android:defaultFocusHighlightEnabled="false"
+        android:focusable="true"
+        android:padding="20dp"
+        android:src="@drawable/ic_close"
+        android:tint="@color/tint_on_focusable"
+        android:visibility="gone"
+        tools:targetApi="o" />
+</LinearLayout>

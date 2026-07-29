@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android TV banner, 320x180. Drawn as a vector so it stays crisp on panels
+     whose launcher density does not match a packaged raster size. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="320dp"
+    android:height="180dp"
+    android:viewportWidth="320"
+    android:viewportHeight="180">
+
+    <path
+        android:fillColor="#0A0C10"
+        android:pathData="M0,0h320v180h-320z" />
+
+    <!-- Orbit mark: an inclined ring with a body riding it. -->
+    <group
+        android:pivotX="62"
+        android:pivotY="90"
+        android:rotation="-28">
+        <path
+            android:pathData="M62,90 m-40,0 a40,21 0 1,0 80,0 a40,21 0 1,0 -80,0"
+            android:strokeColor="#6AA6FF"
+            android:strokeWidth="6" />
+    </group>
+    <path
+        android:fillColor="#E8ECF2"
+        android:pathData="M62,90 m-14,0 a14,14 0 1,0 28,0 a14,14 0 1,0 -28,0" />
+
+    <!-- Wordmark -->
+    <group>
+        <path
+            android:pathData="M148,64 a15,15 0 0 0 -15,15 v22 a15,15 0 0 0 30,0 v-22 a15,15 0 0 0 -15,-15 z"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="8" />
+
+        <path
+            android:pathData="M180,116 v-52 h13 a13,13 0 0 1 0,26 h-13"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="8" />
+        <path
+            android:pathData="M194,90 l14,26"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="8" />
+
+        <path
+            android:pathData="M222,116 v-52 h12 a13,13 0 0 1 0,26 h-12 h13 a13,13 0 0 1 0,26 h-13"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:strokeWidth="8" />
+
+        <path
+            android:pathData="M258,64 v52"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="8" />
+
+        <path
+            android:pathData="M272,66 h34"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="8" />
+        <path
+            android:pathData="M289,66 v50"
+            android:strokeColor="#E8ECF2"
+            android:strokeLineCap="round"
+            android:strokeWidth="8" />
+    </group>
+</vector>
