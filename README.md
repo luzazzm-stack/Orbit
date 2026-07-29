@@ -139,7 +139,8 @@ no network round trip at all.
 ## Features
 
 **Browsing** — tabs (memory-capped, LRU-frozen), bookmarks, history, downloads
-list, start page with shortcut tiles, omnibox that takes URLs or searches
+list, start page with shortcut tiles showing **real site logos** (see below),
+omnibox that takes URLs or searches
 (Google / DuckDuckGo / Bing / YouTube), voice search via `RecognizerIntent`,
 `http`/`https` `VIEW` intent handling so other TV apps can hand off links.
 
@@ -158,6 +159,24 @@ images off (a real speed lever on this hardware), JavaScript toggle.
 
 The desktop user-agent is on by default and derives its Chrome version from the
 real engine, so sites never serve 2019 fallback markup.
+
+### Site icons
+
+No single icon source is reliable, so three are used in descending order of
+quality, and the lettered monogram remains the fallback:
+
+1. **`WebChromeClient.onReceivedIcon`** — for any page actually visited,
+   Chromium hands over the already-decoded favicon. Free, exact, no third
+   party, and it copes with genuine `.ico` files that `BitmapFactory` cannot.
+2. **The site's own `apple-touch-icon.png`** — usually 180px, so it stays crisp
+   at TV sizes, and fetched straight from the site itself.
+3. **DuckDuckGo's icon service** — covers the many sites that ship neither.
+   Switchable off in Settings; the first two keep working without it.
+
+Icons are cached in `filesDir` as 96px PNGs and passed to the start page as
+`data:` URIs, so **rendering the start page makes no network requests at all**.
+Missing icons are fetched in the background and the tiles re-render once the
+batch settles.
 
 ### What a WebView browser genuinely cannot do
 
