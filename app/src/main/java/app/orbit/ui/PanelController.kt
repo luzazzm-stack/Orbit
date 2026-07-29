@@ -344,6 +344,21 @@ class PanelController(
             onClick = { show(Section.DOWNLOADS) }
         )
         out += PanelItem.Row(
+            title = "Look up missing site icons",
+            subtitle = "Icons from pages you open are always saved locally",
+            iconRes = R.drawable.ic_image,
+            value = onOff(Prefs.remoteIcons),
+            onClick = { Prefs.remoteIcons = !Prefs.remoteIcons; refresh() }
+        )
+        out += PanelItem.Row(
+            title = "Clear site icons",
+            iconRes = R.drawable.ic_trash,
+            onClick = {
+                app.orbit.core.FaviconStore.clear()
+                cb.toast("Site icons cleared")
+            }
+        )
+        out += PanelItem.Row(
             title = "Clear cookies and cache",
             iconRes = R.drawable.ic_cookie,
             onClick = { cb.onClearCookiesAndCache(); refresh() }

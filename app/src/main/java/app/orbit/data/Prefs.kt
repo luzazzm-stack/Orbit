@@ -27,6 +27,7 @@ object Prefs {
     private const val K_HTTPS_ONLY = "https_only"
     private const val K_3P_COOKIES = "third_party_cookies"
     private const val K_FORCE_DARK = "force_dark"
+    private const val K_REMOTE_ICONS = "remote_icons"
 
     lateinit var sp: SharedPreferences
         private set
@@ -126,6 +127,15 @@ object Prefs {
     var forceDark: Boolean
         get() = sp.getBoolean(K_FORCE_DARK, false)
         set(v) = sp.edit().putBoolean(K_FORCE_DARK, v).apply()
+
+    /**
+     * Allow the start page to look up icons for sites not visited yet. Icons
+     * from pages you actually open are always captured locally; this only
+     * controls the third-party lookup for the rest.
+     */
+    var remoteIcons: Boolean
+        get() = sp.getBoolean(K_REMOTE_ICONS, true)
+        set(v) = sp.edit().putBoolean(K_REMOTE_ICONS, v).apply()
 
     /** "home" = the built-in start page, "url" = a fixed page. */
     var startMode: String

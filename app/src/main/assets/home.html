@@ -146,6 +146,20 @@
     font-weight:700;
     color:#0A0C10;
     text-transform:uppercase;
+    overflow:hidden;
+  }
+
+  /* Real site icons sit on a light plate: a great many favicons are dark
+     artwork on a transparent background and would vanish on a dark tile. */
+  .badge.has-icon{
+    background:#FFFFFF;
+    padding:7px;
+  }
+  .badge.has-icon img{
+    width:100%;
+    height:100%;
+    object-fit:contain;
+    display:block;
   }
 
   .meta{min-width:0}
@@ -301,10 +315,27 @@
       a.className = 'tile';
       a.href = site.url;
 
+      var letter = (name.trim()[0] || '?');
       var badge = document.createElement('div');
       badge.className = 'badge';
-      badge.style.background = colourFor(host);
-      badge.textContent = (name.trim()[0] || '?');
+
+      function useMonogram() {
+        badge.className = 'badge';
+        badge.textContent = letter;
+        badge.style.background = colourFor(host);
+      }
+
+      if (site.icon) {
+        badge.classList.add('has-icon');
+        var img = document.createElement('img');
+        // The app supplies a data: URI, so this cannot hit the network here.
+        img.src = site.icon;
+        img.alt = '';
+        img.onerror = useMonogram;
+        badge.appendChild(img);
+      } else {
+        useMonogram();
+      }
 
       var meta = document.createElement('div');
       meta.className = 'meta';

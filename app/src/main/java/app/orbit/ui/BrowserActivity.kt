@@ -30,6 +30,7 @@ import androidx.appcompat.app.AppCompatActivity
 import app.orbit.R
 import app.orbit.core.AdBlocker
 import app.orbit.core.DohResolver
+import app.orbit.core.FaviconStore
 import app.orbit.core.TabManager
 import app.orbit.core.UrlUtils
 import app.orbit.core.WebViewFactory
@@ -254,6 +255,12 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 onTabsChanged()
             }
 
+            override fun onReceivedIcon(view: WebView, icon: android.graphics.Bitmap?) {
+                // The best icon source we have: Chromium already decoded it,
+                // including real .ico files that BitmapFactory cannot read.
+                FaviconStore.saveFromWebView(UrlUtils.host(view.url), icon)
+            }
+
             override fun onShowCustomView(view: View, callback: CustomViewCallback) {
                 enterFullscreen(view, callback)
             }
@@ -309,20 +316,27 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
      * bridge would be reachable from every page the browser ever loads, which
      * is a needless attack surface for a feature only the start page uses.
      */
-    private fun injectHomeData(wv: WebView) {
-        val sites = JSONArray()
-        val seen = HashSet<String>()
-
-        Store.bookmarks.take(6).forEach { entry ->
-            if (seen.add(entry.url)) {
-                sites.put(JSONObject().put("title", entry.title).put("url", entry.url))
-            }
+    private fun injectHomeData(wv: WebView, allowIconFetch: Boolean = true) {
+        // Map.putIfAbsent is API 24; minSdk here is 21, so do it the long way.
+        val entries = LinkedHashMap<String, app.orbit.data.SiteEntry>()
+        Store.bookmarks.take(6).forEach { if (!entries.containsKey(it.url)) entries[it.url] = it }
+        Store.topSites(6).forEach {
+            if (entries.size < 6 && !entries.containsKey(it.url)) entries[it.url] = it
         }
-        Store.topSites(6).forEach { entry ->
-            if (sites.length() >= 6) return@forEach
-            if (seen.add(entry.url)) {
-                sites.put(JSONObject().put("title", entry.title).put("url", entry.url))
-            }
+
+        val sites = JSONArray()
+        val missingHosts = mutableListOf<String>()
+
+        entries.values.take(6).forEach { entry ->
+            val host = UrlUtils.host(entry.url)
+            val icon = FaviconStore.dataUri(host)
+            if (icon == null && host.isNotEmpty()) missingHosts += host
+            sites.put(
+                JSONObject()
+                    .put("title", entry.title)
+                    .put("url", entry.url)
+                    .apply { if (icon != null) put("icon", icon) }
+            )
         }
 
         val payload = JSONObject()
@@ -330,6 +344,24 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             .put("sites", sites)
 
         wv.evaluateJavascript("window.orbitInit && window.orbitInit($payload);", null)
+
+        // Fetch whatever had no icon, then re-render once the batch settles so
+        // the tiles fill in rather than waiting for the next visit.
+        if (allowIconFetch && missingHosts.isNotEmpty()) {
+            val remaining = java.util.concurrent.atomic.AtomicInteger(missingHosts.size)
+            missingHosts.forEach { host ->
+                FaviconStore.ensure(host) {
+                    if (remaining.decrementAndGet() == 0) {
+                        ui.post {
+                            val current = tabs.activeWebView
+                            if (current != null && UrlUtils.isHome(current.url)) {
+                                injectHomeData(current, allowIconFetch = false)
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /** HTTPS-only mode: retry plain http navigations over TLS instead. */
