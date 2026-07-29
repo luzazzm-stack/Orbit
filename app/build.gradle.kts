@@ -11,8 +11,8 @@ android {
         applicationId = "app.orbit"
         minSdk = 21
         targetSdk = 34
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.2.0"
         resourceConfigurations += listOf("en")
     }
 
@@ -81,4 +81,10 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     implementation("com.google.android.material:material:1.12.0")
+
+    // DNS-over-HTTPS. WebView exposes no way to change Chromium's resolver, so
+    // AdGuard DNS is used as a blocking oracle instead: resolve the host over
+    // DoH and drop the request when AdGuard answers 0.0.0.0 / NXDOMAIN.
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
 }

@@ -54,11 +54,22 @@ object WebViewFactory {
         s.saveFormData = false
 
         applyUserAgent(wv)
+        applyContentSettings(wv)
 
         CookieManager.getInstance().setAcceptCookie(true)
-        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
 
         return wv
+    }
+
+    /** Everything the user can flip at runtime, applied to a live WebView. */
+    fun applyContentSettings(wv: WebView) {
+        val s = wv.settings
+        s.textZoom = Prefs.textZoom
+        s.javaScriptEnabled = Prefs.javaScript
+        s.loadsImagesAutomatically = Prefs.loadImages
+        s.blockNetworkImage = !Prefs.loadImages
+        CookieManager.getInstance().setAcceptThirdPartyCookies(wv, Prefs.thirdPartyCookies)
+        applyForceDark(wv, Prefs.forceDark)
     }
 
     fun applyUserAgent(wv: WebView) {
@@ -70,9 +81,6 @@ object WebViewFactory {
         }
     }
 
-    fun applyTextZoom(wv: WebView) {
-        wv.settings.textZoom = Prefs.textZoom
-    }
 
     /**
      * Force-dark makes light-themed sites bearable on a TV in a dark room, but

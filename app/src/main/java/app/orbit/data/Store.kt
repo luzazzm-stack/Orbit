@@ -37,24 +37,32 @@ object Store {
     private const val TAG = "OrbitStore"
     private const val HISTORY_CAP = 400
 
+    private const val DOWNLOAD_CAP = 60
+
     private lateinit var bookmarksFile: File
     private lateinit var historyFile: File
+    private lateinit var downloadsFile: File
 
     private val _bookmarks = mutableListOf<SiteEntry>()
     private val _history = mutableListOf<SiteEntry>()
+    private val _downloads = mutableListOf<SiteEntry>()
 
     val bookmarks: List<SiteEntry> get() = _bookmarks
     val history: List<SiteEntry> get() = _history
+    val downloads: List<SiteEntry> get() = _downloads
 
     @Synchronized
     fun init(ctx: Context) {
         val dir = ctx.applicationContext.filesDir
         bookmarksFile = File(dir, "bookmarks.json")
         historyFile = File(dir, "history.json")
+        downloadsFile = File(dir, "downloads.json")
         _bookmarks.clear()
         _bookmarks.addAll(read(bookmarksFile))
         _history.clear()
         _history.addAll(read(historyFile))
+        _downloads.clear()
+        _downloads.addAll(read(downloadsFile))
         if (_bookmarks.isEmpty()) {
             _bookmarks.addAll(defaultBookmarks())
             write(bookmarksFile, _bookmarks)
@@ -107,6 +115,19 @@ object Store {
     fun clearHistory() {
         _history.clear()
         write(historyFile, _history)
+    }
+
+    @Synchronized
+    fun addDownload(fileName: String, url: String) {
+        _downloads.add(0, SiteEntry(url, fileName))
+        while (_downloads.size > DOWNLOAD_CAP) _downloads.removeAt(_downloads.size - 1)
+        write(downloadsFile, _downloads)
+    }
+
+    @Synchronized
+    fun clearDownloads() {
+        _downloads.clear()
+        write(downloadsFile, _downloads)
     }
 
     /**

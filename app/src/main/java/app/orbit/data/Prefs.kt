@@ -20,6 +20,13 @@ object Prefs {
     private const val K_HOME_URL = "home_url"
     private const val K_SMOOTH_SCROLL = "smooth_scroll"
     private const val K_DEFAULT_CURSOR = "default_cursor"
+    private const val K_DOH = "doh_enabled"
+    private const val K_DOH_URL = "doh_url"
+    private const val K_IMAGES = "load_images"
+    private const val K_JS = "javascript"
+    private const val K_HTTPS_ONLY = "https_only"
+    private const val K_3P_COOKIES = "third_party_cookies"
+    private const val K_FORCE_DARK = "force_dark"
 
     lateinit var sp: SharedPreferences
         private set
@@ -73,6 +80,52 @@ object Prefs {
     var defaultCursorMode: Boolean
         get() = sp.getBoolean(K_DEFAULT_CURSOR, false)
         set(v) = sp.edit().putBoolean(K_DEFAULT_CURSOR, v).apply()
+
+    /**
+     * DNS-over-HTTPS filtering. See DohResolver: AdGuard's answer is used as a
+     * block/allow verdict rather than as the browser's actual resolver, which
+     * WebView does not allow us to replace.
+     */
+    var doh: Boolean
+        get() = sp.getBoolean(K_DOH, true)
+        set(v) = sp.edit().putBoolean(K_DOH, v).apply()
+
+    val dohProviders = linkedMapOf(
+        "AdGuard" to "https://dns.adguard.com/dns-query",
+        "AdGuard Family" to "https://family.adguard-dns.com/dns-query",
+        "Cloudflare" to "https://cloudflare-dns.com/dns-query",
+        "Quad9" to "https://dns.quad9.net/dns-query"
+    )
+
+    var dohUrl: String
+        get() = sp.getString(K_DOH_URL, dohProviders.getValue("AdGuard"))
+            ?: dohProviders.getValue("AdGuard")
+        set(v) = sp.edit().putString(K_DOH_URL, v).apply()
+
+    val dohProviderName: String
+        get() = dohProviders.entries.firstOrNull { it.value == dohUrl }?.key ?: "Custom"
+
+    /** Turning images off is a real speed lever on a 1.7 GB box. */
+    var loadImages: Boolean
+        get() = sp.getBoolean(K_IMAGES, true)
+        set(v) = sp.edit().putBoolean(K_IMAGES, v).apply()
+
+    var javaScript: Boolean
+        get() = sp.getBoolean(K_JS, true)
+        set(v) = sp.edit().putBoolean(K_JS, v).apply()
+
+    var httpsOnly: Boolean
+        get() = sp.getBoolean(K_HTTPS_ONLY, false)
+        set(v) = sp.edit().putBoolean(K_HTTPS_ONLY, v).apply()
+
+    var thirdPartyCookies: Boolean
+        get() = sp.getBoolean(K_3P_COOKIES, false)
+        set(v) = sp.edit().putBoolean(K_3P_COOKIES, v).apply()
+
+    /** Force-dark helps in a dark room but mangles sites with their own theme. */
+    var forceDark: Boolean
+        get() = sp.getBoolean(K_FORCE_DARK, false)
+        set(v) = sp.edit().putBoolean(K_FORCE_DARK, v).apply()
 
     /** "home" = the built-in start page, "url" = a fixed page. */
     var startMode: String

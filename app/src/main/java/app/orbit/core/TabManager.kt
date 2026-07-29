@@ -47,6 +47,15 @@ class TabManager(
         return tab
     }
 
+    fun newPrivateTab(url: String? = null): Tab? {
+        val tab = newTab(url) ?: return null
+        tab.isPrivate = true
+        onChanged()
+        return tab
+    }
+
+    val hasPrivateTabs: Boolean get() = tabs.any { it.isPrivate }
+
     /**
      * A tab that comes up empty, for window.open(): Chromium drives the first
      * navigation itself, so loading a start page here would race it.

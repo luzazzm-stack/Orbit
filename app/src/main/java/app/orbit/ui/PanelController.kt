@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import app.orbit.R
+import app.orbit.core.AdBlocker
 import app.orbit.core.TabManager
 import app.orbit.core.UrlUtils
 import app.orbit.data.Prefs
@@ -16,7 +17,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * The right-hand panel: tabs, bookmarks, history and settings.
+ * The right-hand panel: tabs, bookmarks, history, downloads and settings.
  *
  * Everything is rendered through one row type so the D-pad behaves identically
  * in every section — one list, one focus model, no surprises.
@@ -32,9 +33,15 @@ class PanelController(
         fun onPanelClosed()
         fun toast(message: String)
         fun onSettingsChanged(reload: Boolean)
+        fun onFindInPage()
+        fun onReaderMode()
+        fun onNewPrivateTab()
+        fun onClearCookiesAndCache()
+        fun onOpenSystemDownloads()
+        fun isPrivate(): Boolean
     }
 
-    enum class Section { TABS, BOOKMARKS, HISTORY, SETTINGS }
+    enum class Section { TABS, BOOKMARKS, HISTORY, SETTINGS, DOWNLOADS }
 
     private val root: View =
         LayoutInflater.from(host.context).inflate(R.layout.view_panel, host, false)
@@ -63,18 +70,13 @@ class PanelController(
         list.layoutManager = LinearLayoutManager(host.context)
         list.adapter = adapter
         list.itemAnimator = null
-
-        tabButtons.forEach { (sec, btn) ->
-            btn.setOnClickListener { show(sec) }
-        }
+        tabButtons.forEach { (sec, btn) -> btn.setOnClickListener { show(sec) } }
     }
 
     fun open(sec: Section = section) {
         host.visibility = View.VISIBLE
         show(sec)
-        host.post {
-            tabButtons[section]?.requestFocus() ?: list.requestFocus()
-        }
+        host.post { tabButtons[section]?.requestFocus() ?: list.requestFocus() }
     }
 
     fun close() {
@@ -95,44 +97,46 @@ class PanelController(
             Section.TABS -> tabItems()
             Section.BOOKMARKS -> bookmarkItems()
             Section.HISTORY -> historyItems()
+            Section.DOWNLOADS -> downloadItems()
             Section.SETTINGS -> settingsItems()
         }
         adapter.submit(items)
+        list.scrollToPosition(0)
         empty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
 
         when (sec) {
             Section.TABS -> footer(
-                R.string.cd_new_tab to {
-                    if (tabs.newTab() == null) cb.toast(str(R.string.tab_limit))
-                    else close()
+                "New tab" to {
+                    if (tabs.newTab() == null) cb.toast(str(R.string.tab_limit)) else close()
                 },
-                null
+                "Private tab" to { cb.onNewPrivateTab(); close() }
             )
             Section.HISTORY -> footer(
                 null,
-                R.string.panel_history to {
+                "Clear history" to {
                     Store.clearHistory()
                     cb.toast(str(R.string.history_cleared))
                     refresh()
                 }
             )
+            Section.DOWNLOADS -> footer(
+                "System downloads" to { cb.onOpenSystemDownloads() },
+                "Clear list" to { Store.clearDownloads(); refresh() }
+            )
             else -> footer(null, null)
         }
     }
 
-    private fun footer(
-        first: Pair<Int, () -> Unit>?,
-        second: Pair<Int, () -> Unit>?
-    ) {
+    private fun footer(first: Pair<String, () -> Unit>?, second: Pair<String, () -> Unit>?) {
         if (first != null) {
             primary.visibility = View.VISIBLE
-            primary.setText(first.first)
+            primary.text = first.first
             primary.setOnClickListener { first.second() }
         } else primary.visibility = View.GONE
 
         if (second != null) {
             secondary.visibility = View.VISIBLE
-            secondary.text = "Clear " + str(second.first).lowercase(Locale.getDefault())
+            secondary.text = second.first
             secondary.setOnClickListener { second.second() }
         } else secondary.visibility = View.GONE
     }
@@ -147,14 +151,8 @@ class PanelController(
             iconRes = if (index == tabs.activeIndex) R.drawable.ic_cursor else R.drawable.ic_globe,
             value = if (tab.isLive) "" else "sleeping",
             actionIcon = R.drawable.ic_close,
-            onClick = {
-                tabs.selectTab(tab)
-                close()
-            },
-            onAction = {
-                tabs.close(tab)
-                refresh()
-            }
+            onClick = { tabs.selectTab(tab); close() },
+            onAction = { tabs.close(tab); refresh() }
         )
     }
 
@@ -164,10 +162,7 @@ class PanelController(
             subtitle = UrlUtils.prettyHost(entry.url),
             iconRes = R.drawable.ic_star,
             actionIcon = R.drawable.ic_close,
-            onClick = {
-                cb.openUrl(entry.url)
-                close()
-            },
+            onClick = { cb.openUrl(entry.url); close() },
             onAction = {
                 Store.removeBookmark(entry.url)
                 cb.toast(str(R.string.bookmark_removed))
@@ -181,63 +176,143 @@ class PanelController(
             title = entry.title,
             subtitle = UrlUtils.prettyHost(entry.url) + "  ·  " + dateFmt.format(Date(entry.time)),
             iconRes = R.drawable.ic_history,
-            onClick = {
-                cb.openUrl(entry.url)
-                close()
-            }
+            onClick = { cb.openUrl(entry.url); close() }
+        )
+    }
+
+    private fun downloadItems(): List<PanelItem> = Store.downloads.map { entry ->
+        PanelItem.Row(
+            title = entry.title,
+            subtitle = UrlUtils.prettyHost(entry.url) + "  ·  " + dateFmt.format(Date(entry.time)),
+            iconRes = R.drawable.ic_download,
+            onClick = { cb.onOpenSystemDownloads() }
         )
     }
 
     private fun settingsItems(): List<PanelItem> {
         val out = mutableListOf<PanelItem>()
 
-        out += PanelItem.Header("Page")
+        // ---- actions on the current page -----------------------------------
+        out += PanelItem.Header("This page")
         out += PanelItem.Row(
-            title = "Search engine",
+            title = "Find in page",
             iconRes = R.drawable.ic_search,
-            value = Prefs.searchEngine.replaceFirstChar { it.uppercase() },
-            onClick = {
-                val keys = Prefs.searchEngines.keys.toList()
-                val next = (keys.indexOf(Prefs.searchEngine) + 1) % keys.size
-                Prefs.searchEngine = keys[next]
-                refresh()
-            }
+            onClick = { close(); cb.onFindInPage() }
+        )
+        out += PanelItem.Row(
+            title = "Reader mode",
+            subtitle = "Strip the page down to the article",
+            iconRes = R.drawable.ic_reader,
+            onClick = { close(); cb.onReaderMode() }
         )
         out += PanelItem.Row(
             title = "Desktop site",
             subtitle = "TV screens fit desktop layouts better than phone ones",
             iconRes = R.drawable.ic_desktop,
             value = onOff(Prefs.desktopUa),
+            onClick = { Prefs.desktopUa = !Prefs.desktopUa; refresh(); cb.onSettingsChanged(true) }
+        )
+
+        // ---- privacy and filtering -----------------------------------------
+        out += PanelItem.Header("Privacy and filtering")
+        out += PanelItem.Row(
+            title = "AdGuard DNS filtering",
+            subtitle = "Blocks ads and trackers over encrypted DNS",
+            iconRes = R.drawable.ic_dns,
+            value = onOff(Prefs.doh),
+            onClick = { Prefs.doh = !Prefs.doh; refresh() }
+        )
+        out += PanelItem.Row(
+            title = "DNS provider",
+            subtitle = Prefs.dohUrl,
+            iconRes = R.drawable.ic_lock,
+            value = Prefs.dohProviderName,
             onClick = {
-                Prefs.desktopUa = !Prefs.desktopUa
+                val keys = Prefs.dohProviders.keys.toList()
+                val idx = keys.indexOf(Prefs.dohProviderName).coerceAtLeast(0)
+                Prefs.dohUrl = Prefs.dohProviders.getValue(keys[(idx + 1) % keys.size])
+                app.orbit.core.DohResolver.reset()
                 refresh()
-                cb.onSettingsChanged(true)
             }
         )
         out += PanelItem.Row(
-            title = "Text size",
-            iconRes = R.drawable.ic_text_size,
-            value = "${Prefs.textZoom}%",
+            title = "Built-in blocklist",
+            subtitle = "${AdBlocker.localListSize()} hosts, applied instantly",
+            iconRes = R.drawable.ic_shield,
+            value = onOff(Prefs.adBlock),
+            onClick = { Prefs.adBlock = !Prefs.adBlock; refresh() }
+        )
+        out += PanelItem.Row(
+            title = "Third-party cookies",
+            iconRes = R.drawable.ic_cookie,
+            value = if (Prefs.thirdPartyCookies) "Allowed" else "Blocked",
             onClick = {
-                val steps = listOf(90, 100, 110, 125, 150, 175)
-                val next = steps[(steps.indexOf(Prefs.textZoom).coerceAtLeast(0) + 1) % steps.size]
-                Prefs.textZoom = next
+                Prefs.thirdPartyCookies = !Prefs.thirdPartyCookies
                 refresh()
                 cb.onSettingsChanged(false)
             }
         )
         out += PanelItem.Row(
-            title = "Block ads and trackers",
-            subtitle = "Also makes heavy pages usable on this box",
-            iconRes = R.drawable.ic_shield,
-            value = onOff(Prefs.adBlock),
+            title = "HTTPS only",
+            subtitle = "Refuse plain http pages",
+            iconRes = R.drawable.ic_lock,
+            value = onOff(Prefs.httpsOnly),
+            onClick = { Prefs.httpsOnly = !Prefs.httpsOnly; refresh() }
+        )
+        out += PanelItem.Row(
+            title = "New private tab",
+            subtitle = "No history, cookies cleared on close",
+            iconRes = R.drawable.ic_incognito,
+            onClick = { close(); cb.onNewPrivateTab() }
+        )
+
+        // ---- display ---------------------------------------------------------
+        out += PanelItem.Header("Display")
+        out += PanelItem.Row(
+            title = "Text size",
+            iconRes = R.drawable.ic_text_size,
+            value = "${Prefs.textZoom}%",
             onClick = {
-                Prefs.adBlock = !Prefs.adBlock
+                val steps = listOf(90, 100, 110, 125, 150, 175, 200)
+                val cur = steps.indexOf(Prefs.textZoom)
+                Prefs.textZoom = steps[(if (cur < 0) 0 else cur + 1) % steps.size]
+                refresh()
+                cb.onSettingsChanged(false)
+            }
+        )
+        out += PanelItem.Row(
+            title = "Load images",
+            subtitle = "Turning this off makes heavy sites much faster here",
+            iconRes = R.drawable.ic_image,
+            value = onOff(Prefs.loadImages),
+            onClick = { Prefs.loadImages = !Prefs.loadImages; refresh(); cb.onSettingsChanged(false) }
+        )
+        out += PanelItem.Row(
+            title = "Dark web pages",
+            subtitle = "Force a dark theme on sites that have none",
+            iconRes = R.drawable.ic_moon,
+            value = onOff(Prefs.forceDark),
+            onClick = { Prefs.forceDark = !Prefs.forceDark; refresh(); cb.onSettingsChanged(false) }
+        )
+        out += PanelItem.Row(
+            title = "JavaScript",
+            iconRes = R.drawable.ic_globe,
+            value = onOff(Prefs.javaScript),
+            onClick = { Prefs.javaScript = !Prefs.javaScript; refresh(); cb.onSettingsChanged(true) }
+        )
+
+        // ---- search and remote ----------------------------------------------
+        out += PanelItem.Header("Search and remote")
+        out += PanelItem.Row(
+            title = "Search engine",
+            iconRes = R.drawable.ic_search,
+            value = Prefs.searchEngine.replaceFirstChar { it.uppercase() },
+            onClick = {
+                val keys = Prefs.searchEngines.keys.toList()
+                Prefs.searchEngine = keys[(keys.indexOf(Prefs.searchEngine) + 1) % keys.size]
                 refresh()
             }
         )
-
-        out += PanelItem.Header("Remote")
         out += PanelItem.Row(
             title = "Pointer speed",
             iconRes = R.drawable.ic_cursor,
@@ -249,28 +324,33 @@ class PanelController(
         )
         out += PanelItem.Row(
             title = "Start pages in pointer mode",
-            subtitle = "Otherwise pages open in link mode",
             iconRes = R.drawable.ic_cursor,
             value = onOff(Prefs.defaultCursorMode),
-            onClick = {
-                Prefs.defaultCursorMode = !Prefs.defaultCursorMode
-                refresh()
-            }
+            onClick = { Prefs.defaultCursorMode = !Prefs.defaultCursorMode; refresh() }
         )
         out += PanelItem.Row(
             title = "Smooth scrolling",
             iconRes = R.drawable.ic_reload,
             value = onOff(Prefs.smoothScroll),
-            onClick = {
-                Prefs.smoothScroll = !Prefs.smoothScroll
-                refresh()
-                cb.onSettingsChanged(false)
-            }
+            onClick = { Prefs.smoothScroll = !Prefs.smoothScroll; refresh(); cb.onSettingsChanged(false) }
         )
 
+        // ---- data -------------------------------------------------------------
         out += PanelItem.Header("Data")
         out += PanelItem.Row(
+            title = "Downloads",
+            subtitle = "${Store.downloads.size} files",
+            iconRes = R.drawable.ic_download,
+            onClick = { show(Section.DOWNLOADS) }
+        )
+        out += PanelItem.Row(
+            title = "Clear cookies and cache",
+            iconRes = R.drawable.ic_cookie,
+            onClick = { cb.onClearCookiesAndCache(); refresh() }
+        )
+        out += PanelItem.Row(
             title = "Clear history",
+            subtitle = "${Store.history.size} entries",
             iconRes = R.drawable.ic_trash,
             onClick = {
                 Store.clearHistory()

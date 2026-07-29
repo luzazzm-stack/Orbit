@@ -132,6 +132,74 @@
             android:src="@drawable/ic_menu" />
     </LinearLayout>
 
+    <!-- Find in page. Sits below the toolbar and owns focus while open. -->
+    <LinearLayout
+        android:id="@+id/findBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top"
+        android:layout_marginTop="104dp"
+        android:background="@drawable/bg_toolbar"
+        android:descendantFocusability="afterDescendants"
+        android:focusable="false"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/overscan_h"
+        android:paddingTop="10dp"
+        android:paddingEnd="@dimen/overscan_h"
+        android:paddingBottom="10dp"
+        android:visibility="gone">
+
+        <EditText
+            android:id="@+id/findInput"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/omnibox_height"
+            android:layout_weight="1"
+            android:background="@drawable/bg_omnibox"
+            android:defaultFocusHighlightEnabled="false"
+            android:hint="Find in page"
+            android:imeOptions="actionSearch|flagNoExtractUi"
+            android:inputType="text"
+            android:maxLines="1"
+            android:paddingStart="22dp"
+            android:paddingEnd="22dp"
+            android:singleLine="true"
+            android:textColor="@color/tint_row_text"
+            android:textColorHint="@color/tint_row_sub"
+            android:textSize="@dimen/text_omnibox"
+            tools:targetApi="o" />
+
+        <TextView
+            android:id="@+id/findCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:layout_marginEnd="10dp"
+            android:minWidth="70dp"
+            android:gravity="center"
+            android:textColor="@color/text_secondary"
+            android:textSize="@dimen/text_body"
+            tools:text="3 / 12" />
+
+        <ImageView
+            android:id="@+id/findPrev"
+            style="@style/ToolButton"
+            android:contentDescription="Previous match"
+            android:src="@drawable/ic_up" />
+
+        <ImageView
+            android:id="@+id/findNext"
+            style="@style/ToolButton"
+            android:contentDescription="Next match"
+            android:src="@drawable/ic_down" />
+
+        <ImageView
+            android:id="@+id/findClose"
+            style="@style/ToolButton"
+            android:contentDescription="@string/cd_close"
+            android:src="@drawable/ic_close" />
+    </LinearLayout>
+
     <ProgressBar
         android:id="@+id/progress"
         style="?android:attr/progressBarStyleHorizontal"

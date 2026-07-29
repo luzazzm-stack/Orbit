@@ -43,9 +43,28 @@ object AdBlocker {
         Log.i(TAG, "loaded ${hosts.size} blocked hosts")
     }
 
-    fun shouldBlock(url: String?): Boolean {
+    /**
+     * Combined verdict: the bundled list first (instant), then AdGuard DNS.
+     *
+     * Main-frame navigations are never blocked by DNS — a wrong verdict there
+     * would look like the browser refusing to open a page the user explicitly
+     * asked for, whereas a wrongly blocked subresource is invisible.
+     */
+    fun shouldBlock(url: String?, isMainFrame: Boolean): Boolean {
+        val host = UrlUtils.host(url)
+        if (host.isEmpty()) return false
+
+        if (app.orbit.data.Prefs.adBlock && inLocalList(host)) return true
+
+        if (app.orbit.data.Prefs.doh && !isMainFrame) {
+            return DohResolver.check(host, DOH_TIMEOUT_MS) == DohResolver.Verdict.BLOCK
+        }
+        return false
+    }
+
+    private fun inLocalList(startHost: String): Boolean {
         if (hosts.isEmpty()) return false
-        var h = UrlUtils.host(url)
+        var h = startHost
         if (h.isEmpty()) return false
         // Walk up the domain: ads.foo.example.com -> foo.example.com -> example.com
         while (true) {
@@ -58,4 +77,13 @@ object AdBlocker {
     }
 
     fun blockedResponse(): WebResourceResponse = EMPTY_RESPONSE
+
+    fun localListSize(): Int = hosts.size
+
+    /**
+     * Short enough that a slow DNS answer cannot stall page rendering. On
+     * timeout the request is allowed and the lookup completes in the
+     * background, so repeat requests to the same host are filtered.
+     */
+    private const val DOH_TIMEOUT_MS = 700L
 }

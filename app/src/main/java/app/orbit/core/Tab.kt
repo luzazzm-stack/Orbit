@@ -29,6 +29,14 @@ class Tab(val id: Int) {
     /** Cursor mode is per-tab: a video site wants a pointer, an article does not. */
     var cursorMode: Boolean = false
 
+    /**
+     * Private tabs record no history and have their session cookies dropped when
+     * the last one closes. WebView shares one cookie jar process-wide, so this
+     * is an approximation of incognito rather than true isolation — the UI says
+     * exactly that rather than overpromising.
+     */
+    var isPrivate: Boolean = false
+
     var lastUsed: Long = System.currentTimeMillis()
 
     val isLive: Boolean get() = webView != null

@@ -29,6 +29,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import app.orbit.R
 import app.orbit.core.AdBlocker
+import app.orbit.core.DohResolver
 import app.orbit.core.TabManager
 import app.orbit.core.UrlUtils
 import app.orbit.core.WebViewFactory
@@ -57,6 +58,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private var centerLongFired = false
     private var lastBackAt = 0L
+    private var hadPrivateTabs = false
 
     private val hideToolbarTask = Runnable { hideToolbar() }
     private val hideToastTask = Runnable { b.toast.visibility = View.GONE }
@@ -101,6 +103,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         panel = PanelController(b.panelHost, tabs, this)
 
         wireToolbar()
+        wireFindBar()
 
         val initial = intent?.dataString?.takeIf { UrlUtils.isHttp(it) }
         tabs.newTab(initial ?: startUrl())
@@ -153,9 +156,13 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 view: WebView,
                 request: WebResourceRequest
             ): WebResourceResponse? {
-                if (!Prefs.adBlock) return null
+                if (!Prefs.adBlock && !Prefs.doh) return null
                 val url = request.url?.toString() ?: return null
-                return if (AdBlocker.shouldBlock(url)) AdBlocker.blockedResponse() else null
+                // Runs on a Chromium worker thread, never the UI thread, so the
+                // bounded DoH wait inside shouldBlock cannot jank the interface.
+                return if (AdBlocker.shouldBlock(url, request.isForMainFrame)) {
+                    AdBlocker.blockedResponse()
+                } else null
             }
 
             override fun shouldOverrideUrlLoading(
@@ -163,12 +170,15 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 request: WebResourceRequest
             ): Boolean {
                 val url = request.url?.toString() ?: return false
+                if (upgradeToHttps(view, url)) return true
                 return handleNonWebScheme(url)
             }
 
             @Deprecated("Kept for API < 24 devices")
-            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean =
-                handleNonWebScheme(url)
+            override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+                if (upgradeToHttps(view, url)) return true
+                return handleNonWebScheme(url)
+            }
 
             override fun onPageStarted(view: WebView, url: String, favicon: android.graphics.Bitmap?) {
                 b.progress.visibility = View.VISIBLE
@@ -176,6 +186,10 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 setOmniboxText(url)
                 tabs.active?.url = url
                 updateBookmarkIcon(url)
+                closeFindBar()
+                // Warm the DNS verdict for the page's own host while it loads,
+                // so its subresources hit a populated cache.
+                if (Prefs.doh) DohResolver.prefetch(UrlUtils.host(url))
             }
 
             override fun onPageFinished(view: WebView, url: String) {
@@ -194,7 +208,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                     tab.url = url
                     tab.title = view.title ?: tab.title
                 }
-                if (!UrlUtils.isHome(url)) {
+                if (!UrlUtils.isHome(url) && tabs.active?.isPrivate != true) {
                     Store.addHistory(url, view.title ?: "")
                 }
                 setOmniboxText(url)
@@ -315,6 +329,14 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         wv.evaluateJavascript("window.orbitInit && window.orbitInit($payload);", null)
     }
 
+    /** HTTPS-only mode: retry plain http navigations over TLS instead. */
+    private fun upgradeToHttps(view: WebView, url: String): Boolean {
+        if (!Prefs.httpsOnly || !url.startsWith("http://")) return false
+        if (url.startsWith("http://localhost") || url.startsWith("http://127.")) return false
+        view.loadUrl("https://" + url.removePrefix("http://"))
+        return true
+    }
+
     private fun handleNonWebScheme(url: String): Boolean {
         if (UrlUtils.isHttp(url) || url.startsWith("file:") || url.startsWith("about:")) return false
         return try {
@@ -352,6 +374,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                     android.os.Environment.DIRECTORY_DOWNLOADS, name
                 )
             (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            Store.addDownload(name, url)
             toast("Downloading $name")
         } catch (t: Throwable) {
             Log.w(TAG, "download failed", t)
@@ -423,6 +446,88 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 hideToolbar()
                 true
             } else false
+        }
+    }
+
+    // ------------------------------------------------------------ find in page
+
+    private fun wireFindBar() {
+        b.findClose.setOnClickListener { closeFindBar() }
+        b.findNext.setOnClickListener { tabs.activeWebView?.findNext(true) }
+        b.findPrev.setOnClickListener { tabs.activeWebView?.findNext(false) }
+
+        b.findInput.showSoftInputOnFocus = false
+        b.findInput.setOnClickListener {
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(b.findInput, InputMethodManager.SHOW_IMPLICIT)
+        }
+        b.findInput.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b2: Int, c: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, a: Int, b2: Int, c: Int) = Unit
+            override fun afterTextChanged(s: android.text.Editable?) {
+                val query = s?.toString().orEmpty()
+                val wv = tabs.activeWebView ?: return
+                if (query.isBlank()) {
+                    wv.clearMatches()
+                    b.findCount.text = ""
+                } else {
+                    wv.findAllAsync(query)
+                }
+            }
+        })
+    }
+
+    private fun openFindBar() {
+        val wv = tabs.activeWebView ?: return
+        wv.setFindListener { active, count, isDoneCounting ->
+            if (isDoneCounting) {
+                b.findCount.text = if (count == 0) "0 / 0" else "${active + 1} / $count"
+            }
+        }
+        showToolbar(focus = false)
+        b.findBar.visibility = View.VISIBLE
+        b.findInput.setText("")
+        b.findCount.text = ""
+        b.findInput.post {
+            b.findInput.requestFocus()
+            val imm = getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+            imm.showSoftInput(b.findInput, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    private fun closeFindBar() {
+        if (b.findBar.visibility != View.VISIBLE) return
+        b.findBar.visibility = View.GONE
+        hideKeyboard()
+        tabs.activeWebView?.clearMatches()
+        tabs.activeWebView?.requestFocus()
+    }
+
+    private val findBarVisible: Boolean get() = b.findBar.visibility == View.VISIBLE
+
+    // ------------------------------------------------------------ reader mode
+
+    private fun toggleReaderMode() {
+        val wv = tabs.activeWebView ?: return
+        if (UrlUtils.isHome(wv.url)) {
+            toast("Reader mode works on article pages")
+            return
+        }
+        val js = try {
+            assets.open("reader.js").bufferedReader().use { it.readText() }
+        } catch (t: Throwable) {
+            Log.w(TAG, "reader.js missing", t)
+            return
+        }
+        wv.evaluateJavascript(js) {
+            wv.evaluateJavascript("window.__ORBIT_READER_RESULT__") { raw ->
+                val r = raw.orEmpty()
+                when {
+                    r.contains("unavailable") -> toast("No article found on this page")
+                    r.contains("\"on\"") || r.contains("\\\"on\\\"") -> toast("Reader mode on")
+                    r.contains("\"off\"") || r.contains("\\\"off\\\"") -> toast("Reader mode off")
+                }
+            }
         }
     }
 
@@ -541,7 +646,18 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private fun onTabsChanged() {
         b.btnTabs.text = tabs.count.toString()
+
+        // Closing the last private tab drops session cookies. WebView shares one
+        // cookie jar across tabs, so this is the closest thing to incognito
+        // teardown that is actually available.
+        if (hadPrivateTabs && !tabs.hasPrivateTabs) {
+            CookieManager.getInstance().removeSessionCookies(null)
+            CookieManager.getInstance().flush()
+        }
+        hadPrivateTabs = tabs.hasPrivateTabs
+
         val tab = tabs.active ?: return
+        b.btnTabs.alpha = if (tab.isPrivate) 0.65f else 1f
         setOmniboxText(tab.url)
         updateNavButtons()
         updateBookmarkIcon(tab.url)
@@ -565,7 +681,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
     /** True when a native control — toolbar or panel — currently owns focus. */
     private fun focusInChrome(): Boolean {
         val f = currentFocus ?: return false
-        return isDescendantOf(b.toolbar, f) || isDescendantOf(b.panelHost, f)
+        return isDescendantOf(b.toolbar, f) ||
+            isDescendantOf(b.panelHost, f) ||
+            isDescendantOf(b.findBar, f)
     }
 
     private fun isDescendantOf(parent: View, child: View): Boolean {
@@ -627,6 +745,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     private fun handleBack(): Boolean {
         if (panel.isOpen) { panel.close(); return true }
+        if (findBarVisible) { closeFindBar(); return true }
         if (toolbarVisible && !UrlUtils.isHome(tabs.active?.url)) { hideToolbar(); return true }
         if (cursor.enabled) { toggleCursor(); return true }
 
@@ -759,12 +878,45 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         tabs.all.forEach { tab ->
             tab.webView?.let { wv ->
                 WebViewFactory.applyUserAgent(wv)
-                WebViewFactory.applyTextZoom(wv)
+                WebViewFactory.applyContentSettings(wv)
             }
         }
         if (reload) tabs.activeWebView?.reload()
         else tabs.activeWebView?.let { spatial.inject(it) }
     }
+
+    override fun onFindInPage() = openFindBar()
+
+    override fun onReaderMode() = toggleReaderMode()
+
+    override fun onNewPrivateTab() {
+        if (tabs.newPrivateTab() == null) {
+            toast(getString(R.string.tab_limit))
+            return
+        }
+        toast("Private tab — nothing saved to history")
+    }
+
+    override fun onClearCookiesAndCache() {
+        CookieManager.getInstance().removeAllCookies(null)
+        CookieManager.getInstance().flush()
+        tabs.all.forEach { it.webView?.clearCache(true) }
+        tabs.activeWebView?.clearFormData()
+        toast("Cookies and cache cleared")
+    }
+
+    override fun onOpenSystemDownloads() {
+        try {
+            startActivity(
+                Intent(DownloadManager.ACTION_VIEW_DOWNLOADS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            )
+        } catch (_: ActivityNotFoundException) {
+            toast("No downloads app on this device")
+        }
+    }
+
+    override fun isPrivate(): Boolean = tabs.active?.isPrivate == true
 
     companion object {
         private const val TAG = "OrbitBrowser"

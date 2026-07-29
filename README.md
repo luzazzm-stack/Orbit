@@ -95,20 +95,72 @@ process. Tabs are capped at 8.
 
 ---
 
+## AdGuard DNS filtering, inside the browser
+
+Orbit filters against **`https://dns.adguard.com/dns-query`** — but not the way
+you might expect, because WebView gives no hook to replace Chromium's DNS
+resolver. Two designs were considered:
+
+| Approach | Why not / why |
+|---|---|
+| Proxy every request through OkHttp with a DoH-backed `Dns` | ❌ `shouldInterceptRequest` never exposes the request **body**, so every POST and file upload would break, and hand-built responses break media **range requests** — video would stop seeking. |
+| **Use the DNS answer as a verdict** ✅ | AdGuard replies `0.0.0.0`/NXDOMAIN for ad, tracker and malware domains. Orbit resolves the host over DoH and drops the request when the answer is a block. Everything else loads over WebView's own network stack, untouched. |
+
+So you get AdGuard's full, continuously-updated blocklist without any of the
+proxying downsides. Practical details:
+
+- verdicts are cached (30 min for blocks, 10 min otherwise, 2048 entries)
+- lookups **fail open** with a 700 ms ceiling — a DNS problem must never stop
+  the web from loading; a timed-out lookup still completes in the background so
+  the next request for that host is filtered
+- the page's own host is prefetched at navigation start, so its subresources hit
+  a warm cache
+- **main-frame navigations are never DNS-blocked** — a wrong verdict there would
+  look like the browser refusing a page you explicitly asked for
+- bootstrapped from AdGuard's literal IPs (`94.140.14.14`, `94.140.15.15`), so
+  resolving the resolver never depends on system DNS
+- switchable to AdGuard Family, Cloudflare or Quad9 in Settings
+
+This runs alongside the bundled ~160-host list, which is applied instantly with
+no network round trip at all.
+
+---
+
 ## Features
 
-- Tabs, bookmarks, history (JSON-persisted, atomic writes, history capped at 400)
-- Omnibox that takes URLs or searches; Google / DuckDuckGo / Bing / YouTube
-- Voice search via `RecognizerIntent`
-- Host-suffix ad and tracker blocking — on this hardware it is a *performance*
-  feature, not just a privacy one
-- Desktop user-agent by default (TV screens fit desktop layouts; the claimed
-  Chrome version is derived from the real engine so sites never serve 2019
-  fallback markup)
-- Fullscreen `<video>` via `onShowCustomView`
-- Adjustable text zoom, pointer speed, smooth scrolling
-- Local start page with shortcut tiles (`assets/home.html`)
-- Registered for `http`/`https` `VIEW` intents, so other TV apps can hand it links
+**Browsing** — tabs (memory-capped, LRU-frozen), bookmarks, history, downloads
+list, start page with shortcut tiles, omnibox that takes URLs or searches
+(Google / DuckDuckGo / Bing / YouTube), voice search via `RecognizerIntent`,
+`http`/`https` `VIEW` intent handling so other TV apps can hand off links.
+
+**Page tools** — find in page with match counts, **reader mode** (heuristic
+article extraction, re-rendered as a single clean column with TV-sized type),
+desktop/mobile user-agent toggle, fullscreen `<video>`.
+
+**Privacy** — AdGuard DoH filtering, bundled blocklist, third-party cookie
+blocking (off by default), HTTPS-only mode, private tabs, clear cookies/cache,
+clear history.
+
+**Display** — text zoom 90–200%, force-dark for sites with no dark theme,
+images off (a real speed lever on this hardware), JavaScript toggle.
+
+**Remote** — pointer speed, default input mode, smooth scrolling.
+
+The desktop user-agent is on by default and derives its Chrome version from the
+real engine, so sites never serve 2019 fallback markup.
+
+### What a WebView browser genuinely cannot do
+
+Being straight about this rather than claiming parity:
+
+- **DRM video** (Netflix, Disney+) — needs a certified app with Widevine L1, not
+  a WebView. No browser on this box will play them.
+- **Extensions** — Chromium's extension system is not part of WebView.
+- **Account sync / password manager / Translate** — these are Google
+  services in Chrome proper, not engine features.
+- **True per-tab incognito** — WebView shares one cookie jar process-wide.
+  Private tabs therefore mean *no history recorded and session cookies dropped
+  when the last one closes*, which is what the UI says.
 
 ---
 
