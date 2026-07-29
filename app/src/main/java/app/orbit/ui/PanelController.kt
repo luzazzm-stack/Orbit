@@ -85,11 +85,27 @@ class PanelController(
         cb.onPanelClosed()
     }
 
+    /**
+     * Re-render in place after a setting changed, keeping the user where they
+     * were. Rebuilding the list otherwise drops focus back to the section chips,
+     * which makes flipping two settings in a row needlessly tedious.
+     */
     fun refresh() {
-        if (isOpen) show(section)
+        if (!isOpen) return
+        val focused = list.focusedChild?.let { list.getChildAdapterPosition(it) }
+            ?: RecyclerView.NO_POSITION
+        show(section, scrollToTop = false)
+        if (focused != RecyclerView.NO_POSITION) {
+            list.post {
+                list.findViewHolderForAdapterPosition(focused)
+                    ?.itemView
+                    ?.findViewById<View>(R.id.rowMain)
+                    ?.requestFocus()
+            }
+        }
     }
 
-    private fun show(sec: Section) {
+    private fun show(sec: Section, scrollToTop: Boolean = true) {
         section = sec
         tabButtons.forEach { (s, btn) -> btn.isSelected = s == sec }
 
@@ -101,7 +117,7 @@ class PanelController(
             Section.SETTINGS -> settingsItems()
         }
         adapter.submit(items)
-        list.scrollToPosition(0)
+        if (scrollToTop) list.scrollToPosition(0)
         empty.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
 
         when (sec) {

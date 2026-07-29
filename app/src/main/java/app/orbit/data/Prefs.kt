@@ -40,14 +40,21 @@ object Prefs {
 
     /** Search engines, keyed by the value stored in prefs. */
     val searchEngines = linkedMapOf(
-        "google" to "https://www.google.com/search?q=",
         "duckduckgo" to "https://duckduckgo.com/?q=",
+        "google" to "https://www.google.com/search?q=",
         "bing" to "https://www.bing.com/search?q=",
         "youtube" to "https://www.youtube.com/results?search_query="
     )
 
+    /**
+     * DuckDuckGo by default, which is not the obvious choice but is the right
+     * one here. Measured on the target TV: Google serves its /sorry/ "unusual
+     * traffic" captcha for ordinary searches from this connection, with or
+     * without a desktop user-agent, because the block is keyed on network
+     * reputation. DuckDuckGo returns results normally from the same IP.
+     */
     var searchEngine: String
-        get() = sp.getString(K_SEARCH, "google") ?: "google"
+        get() = sp.getString(K_SEARCH, "duckduckgo") ?: "duckduckgo"
         set(v) = sp.edit().putString(K_SEARCH, v).apply()
 
     val searchUrlTemplate: String
