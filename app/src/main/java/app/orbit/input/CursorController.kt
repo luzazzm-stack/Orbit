@@ -108,7 +108,14 @@ class CursorController(
             KeyEvent.KEYCODE_DPAD_UP, KeyEvent.KEYCODE_DPAD_DOWN,
             KeyEvent.KEYCODE_DPAD_LEFT, KeyEvent.KEYCODE_DPAD_RIGHT -> {
                 if (pressed.isEmpty()) pressStartMs = SystemClock.uptimeMillis()
-                if (pressed.add(keyCode)) startLoop()
+                if (pressed.add(keyCode)) {
+                    // A fixed step on press. The frame loop measures elapsed time,
+                    // so its first frame necessarily moves nothing — without this
+                    // a quick tap could travel zero pixels, making it impossible
+                    // to line the pointer up on something small like a checkbox.
+                    nudge(keyCode)
+                    startLoop()
+                }
                 true
             }
             KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
@@ -142,6 +149,27 @@ class CursorController(
     }
 
     // ---------------------------------------------------------------- motion
+
+    private fun nudge(keyCode: Int) {
+        val w = overlay.width.toFloat()
+        val h = overlay.height.toFloat()
+        if (w <= 0f || h <= 0f) return
+        val dx = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_LEFT -> -NUDGE_PX
+            KeyEvent.KEYCODE_DPAD_RIGHT -> NUDGE_PX
+            else -> 0f
+        }
+        val dy = when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_UP -> -NUDGE_PX
+            KeyEvent.KEYCODE_DPAD_DOWN -> NUDGE_PX
+            else -> 0f
+        }
+        overlay.moveTo(
+            (overlay.cursorX + dx).coerceIn(2f, w - 2f),
+            (overlay.cursorY + dy).coerceIn(2f, h - 2f)
+        )
+        sendHover(MotionEvent.ACTION_HOVER_MOVE)
+    }
 
     private fun startLoop() {
         if (running) return
@@ -283,5 +311,6 @@ class CursorController(
         private const val RAMP_MS = 750f
         private const val EDGE_BAND = 90f       // px from the edge where scrolling takes over
         private const val SCROLL_STEP = 1.15f   // wheel notches per frame
+        private const val NUDGE_PX = 16f        // guaranteed travel for a single tap
     }
 }
