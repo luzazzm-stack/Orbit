@@ -104,7 +104,10 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
         val initial = intent?.dataString?.takeIf { UrlUtils.isHttp(it) }
         tabs.newTab(initial ?: startUrl())
-        showToolbar(focus = true)
+        // Deliberately unfocused: focusing the address bar at launch drags the
+        // leanback keyboard up over the whole screen before the user has asked
+        // for it. Focus lands on the page instead, via spatial navigation.
+        showToolbar(focus = false)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -178,7 +181,15 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             override fun onPageFinished(view: WebView, url: String) {
                 b.progress.visibility = View.GONE
                 spatial.inject(view)
-                if (UrlUtils.isHome(url)) injectHomeData(view)
+                if (UrlUtils.isHome(url)) {
+                    injectHomeData(view)
+                    // Give the start page a visible selection straight away so
+                    // it never looks inert on launch.
+                    if (!cursor.enabled && !focusInChrome()) {
+                        view.requestFocus()
+                        view.postDelayed({ spatial.enter(view) }, 80)
+                    }
+                }
                 tabs.active?.let { tab ->
                     tab.url = url
                     tab.title = view.title ?: tab.title

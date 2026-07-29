@@ -31,11 +31,13 @@
     display:flex;
     align-items:center;
     justify-content:center;
-    /* 5% inset keeps everything clear of TV overscan cropping. */
-    padding:5vh 5vw;
+    /* 5vw/5vh is the TV overscan inset. The larger top value additionally
+       clears the app's toolbar, which stays pinned over the start page. */
+    padding:118px 5vw 5vh;
+    overflow-x:hidden;
   }
 
-  .wrap{width:100%;max-width:1180px}
+  .wrap{width:100%;max-width:1180px;min-width:0}
 
   header{
     display:flex;
@@ -106,7 +108,10 @@
 
   .grid{
     display:grid;
-    grid-template-columns:repeat(4,1fr);
+    /* minmax(0,1fr), not 1fr: grid items default to min-width:auto, so a long
+       unbreakable title would otherwise widen its track and push the whole
+       grid off the right of the screen. */
+    grid-template-columns:repeat(4,minmax(0,1fr));
     gap:20px;
   }
 
@@ -114,6 +119,7 @@
     display:flex;
     align-items:center;
     gap:16px;
+    min-width:0;
     padding:20px;
     background:var(--surface);
     border:1px solid var(--line);

@@ -49,7 +49,7 @@
             android:launchMode="singleTask"
             android:screenOrientation="landscape"
             android:theme="@style/Theme.Orbit"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="stateAlwaysHidden|adjustResize">
 
             <!-- LEANBACK_LAUNCHER only. Declaring plain LAUNCHER as well makes the
                  app appear twice on an Android TV home screen. -->
