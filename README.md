@@ -76,12 +76,22 @@ straight through untouched.
 | **OK** | Activate the focused element · click in pointer mode |
 | **Hold OK** (600 ms) | Toggle pointer mode |
 | **BACK** | Exit pointer mode → close panel → hide toolbar → page back → close tab → exit |
-| **MENU / INFO** | Toggle the toolbar |
-| **▲ at top of page** | Opens the toolbar |
+| **▲ at top of page** | Opens the toolbar — the reliable route on this TV |
+| **MENU / INFO / GUIDE** | Toggle the toolbar, *where the remote delivers it* |
 | **▼ from the toolbar** | Returns to the page |
 | **SEARCH** | Focus the address bar |
 | Play/Pause, FF, RW | Control the first `<video>` on the page (±15 s) |
 | Ch+/Ch−, PgUp/PgDn | Page scroll |
+
+---
+
+### Device quirk found in testing
+
+**`KEYCODE_MENU` never reaches the app on this Skyworth** — the TV firmware
+intercepts it and shows its own Picture Mode / Sound Mode overlay. It is still
+bound (along with `INFO`, `GUIDE`, `TV_CONTENTS_MENU` and `BUTTON_Y`) for remotes
+where it does arrive, but **▲ at the top of a page** is the route that always
+works, and it is what the start page tells you to use.
 
 ---
 

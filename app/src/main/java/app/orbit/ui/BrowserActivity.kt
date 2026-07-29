@@ -215,6 +215,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
                 updateNavButtons()
                 updateBookmarkIcon(url)
                 onTabsChanged()
+                // Starting on the home page means no auto-hide was ever armed;
+                // arm it now that there is real content behind the bar.
+                if (toolbarVisible) scheduleToolbarAutoHide()
             }
 
             override fun doUpdateVisitedHistory(view: WebView, url: String, isReload: Boolean) {
@@ -709,7 +712,13 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         when (event.keyCode) {
             KeyEvent.KEYCODE_BACK -> if (down) return handleBack()
 
-            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_SETTINGS -> {
+            // NOTE: on the Skyworth, KEYCODE_MENU never reaches the app — the TV
+            // firmware grabs it for its own Picture/Sound overlay. It is still
+            // bound here for remotes where it does arrive, but the reliable
+            // route to the toolbar is UP at the top of a page.
+            KeyEvent.KEYCODE_MENU, KeyEvent.KEYCODE_INFO, KeyEvent.KEYCODE_SETTINGS,
+            KeyEvent.KEYCODE_GUIDE, KeyEvent.KEYCODE_TV_CONTENTS_MENU,
+            KeyEvent.KEYCODE_BUTTON_Y -> {
                 if (down) {
                     if (toolbarVisible) hideToolbar() else showToolbar(focus = true)
                 }
@@ -920,7 +929,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
     companion object {
         private const val TAG = "OrbitBrowser"
-        private const val TOOLBAR_TIMEOUT = 6000L
+        // 6s proved too twitchy in testing: pausing to look at the toolbar made
+        // it vanish, and the next keypress then went to the page instead.
+        private const val TOOLBAR_TIMEOUT = 12000L
         private const val LONG_PRESS_MS = 600L
     }
 }
