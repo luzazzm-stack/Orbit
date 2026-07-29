@@ -50,6 +50,9 @@ class CursorController(
 
     fun enable(centreOn: View) {
         if (enabled) return
+        android.util.Log.i(
+            "OrbitCursor", "cursor.enable()", Throwable("cursor-enable-trace")
+        )
         enabled = true
         if (overlay.cursorX <= 0f || overlay.cursorY <= 0f) {
             if (centreOn.width > 0 && centreOn.height > 0) {
