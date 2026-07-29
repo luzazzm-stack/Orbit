@@ -160,6 +160,23 @@ images off (a real speed lever on this hardware), JavaScript toggle.
 The desktop user-agent is on by default and derives its Chrome version from the
 real engine, so sites never serve 2019 fallback markup.
 
+### Why the default search engine is DuckDuckGo
+
+Because it was tested, not assumed. Google served its `/sorry/index` "unusual
+traffic" captcha for an ordinary search from this TV. The obvious suspect was
+the desktop user-agent — so it was toggled off and the *identical* search run
+again: **same captcha, same IP, minutes apart.**
+
+The block is keyed on network reputation, not the browser. Google's own wording
+is "unusual traffic from your computer **network**", and the connection is a
+shared ISP address. Worse, WebView's native mobile UA carries a `wv` token
+marking it an embedded view, which is a *less* trustworthy signal than the
+desktop string Orbit sends.
+
+DuckDuckGo returns results normally from the same connection, so it is the
+default. Google is one click away in Settings, and desktop UA stays on because
+it gives better TV layouts and avoids the `wv` token.
+
 ### Site icons
 
 No single icon source is reliable, so three are used in descending order of
