@@ -847,6 +847,9 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
             isDescendantOf(b.findBar, f)
     }
 
+    private fun focusInToolbar(): Boolean =
+        currentFocus?.let { isDescendantOf(b.toolbar, it) } == true
+
     private fun isDescendantOf(parent: View, child: View): Boolean {
         var v: View? = child
         while (v != null) {
@@ -902,10 +905,23 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         return false
     }
 
+    /**
+     * BACK unwinds one layer at a time, innermost first.
+     *
+     * The ordering rule is "dismiss the thing the user is actually inside".
+     * Pointer mode ranks above the toolbar because it is a real input mode —
+     * it changes what every other key does — whereas a visible toolbar is
+     * transient chrome that hides itself on a timer. Getting that backwards
+     * meant BACK silently dismissed the toolbar while the user was trying to
+     * leave the pointer, and the next keypress went somewhere unexpected.
+     *
+     * The toolbar only claims BACK when focus is genuinely in it; when it is
+     * merely on screen, BACK belongs to the page.
+     */
     private fun handleBack(): Boolean {
         if (panel.isOpen) { panel.close(); return true }
         if (findBarVisible) { closeFindBar(); return true }
-        if (toolbarVisible && !UrlUtils.isHome(tabs.active?.url)) { hideToolbar(); return true }
+        if (toolbarVisible && focusInToolbar()) { hideToolbar(); return true }
         if (cursor.enabled) { toggleCursor(); return true }
 
         val wv = tabs.activeWebView
@@ -925,8 +941,7 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
         if (event.action != KeyEvent.ACTION_DOWN) return false
         scheduleToolbarAutoHide()
 
-        val inToolbar = currentFocus?.let { isDescendantOf(b.toolbar, it) } == true
-        if (inToolbar && event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+        if (focusInToolbar() && event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
             hideToolbar()
             tabs.activeWebView?.let { wv ->
                 wv.requestFocus()

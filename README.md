@@ -75,7 +75,7 @@ straight through untouched.
 | D-pad | Move between links · move the pointer in pointer mode |
 | **OK** | Activate the focused element · click in pointer mode |
 | **Hold OK** (600 ms) | Toggle pointer mode |
-| **BACK** | Exit pointer mode → close panel → hide toolbar → page back → close tab → exit |
+| **BACK** | Unwinds one layer at a time: close panel → close find bar → leave the toolbar (only if focus is in it) → exit pointer mode → page back → close tab → start page → exit |
 | **▲ at top of page** | Opens the toolbar — the reliable route on this TV |
 | **MENU / INFO / GUIDE** | Toggle the toolbar, *where the remote delivers it* |
 | **▼ from the toolbar** | Returns to the page |
