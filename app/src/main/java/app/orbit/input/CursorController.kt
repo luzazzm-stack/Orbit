@@ -239,11 +239,28 @@ class CursorController(
         if (downTime == 0L) return
         dispatchPointer(MotionEvent.ACTION_UP, 0)
         downTime = 0L
+        // Restore the hover state the tap displaced, so whatever is under the
+        // pointer stays lit.
+        if (hovering) sendHover(MotionEvent.ACTION_HOVER_MOVE)
     }
 
+    /**
+     * Clicks go out as a **touch**, not a mouse button.
+     *
+     * Hover and wheel work beautifully as SOURCE_MOUSE — including inside
+     * cross-origin iframes — but a synthesised mouse *button* does not reach
+     * those frames, which was why a reCAPTCHA checkbox highlighted on hover and
+     * then ignored the click. Android's public MotionEvent API cannot set
+     * `actionButton`, so a genuine ACTION_BUTTON_PRESS is not constructible.
+     * A touch tap is the path every mobile browser already uses to drive that
+     * same widget, and Chromium turns it into mousedown/mouseup/click for us.
+     */
     private fun dispatchPointer(action: Int, buttonState: Int) {
         val wv = webViewProvider() ?: return
-        val ev = build(action, buttonState, 0f) ?: return
+        val ev = build(
+            action, buttonState, 0f,
+            InputDevice.SOURCE_TOUCHSCREEN, MotionEvent.TOOL_TYPE_FINGER
+        ) ?: return
         try {
             wv.dispatchTouchEvent(ev)
         } finally {
@@ -272,11 +289,17 @@ class CursorController(
     }
 
     /** Coordinates are overlay-relative; the overlay is laid out over the WebView. */
-    private fun build(action: Int, buttonState: Int, vscroll: Float): MotionEvent? {
+    private fun build(
+        action: Int,
+        buttonState: Int,
+        vscroll: Float,
+        source: Int = InputDevice.SOURCE_MOUSE,
+        toolType: Int = MotionEvent.TOOL_TYPE_MOUSE
+    ): MotionEvent? {
         val now = SystemClock.uptimeMillis()
         val props = MotionEvent.PointerProperties().apply {
             id = 0
-            toolType = MotionEvent.TOOL_TYPE_MOUSE
+            this.toolType = toolType
         }
         val coords = MotionEvent.PointerCoords().apply {
             x = overlay.cursorX
@@ -297,7 +320,7 @@ class CursorController(
                 buttonState,
                 1f, 1f,
                 0, 0,
-                InputDevice.SOURCE_MOUSE,
+                source,
                 0
             )
         } catch (t: Throwable) {
