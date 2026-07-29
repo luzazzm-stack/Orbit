@@ -362,17 +362,25 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
      * is a needless attack surface for a feature only the start page uses.
      */
     private fun injectHomeData(wv: WebView, allowIconFetch: Boolean = true) {
+        // Keyed by host, not URL: "google.com" and "www.google.com/" are the
+        // same shortcut to a person, and showing both wastes a scarce tile.
         // Map.putIfAbsent is API 24; minSdk here is 21, so do it the long way.
         val entries = LinkedHashMap<String, app.orbit.data.SiteEntry>()
-        Store.bookmarks.take(8).forEach { if (!entries.containsKey(it.url)) entries[it.url] = it }
-        Store.topSites(8).forEach {
-            if (entries.size < 8 && !entries.containsKey(it.url)) entries[it.url] = it
+        Store.bookmarks.forEach {
+            val host = UrlUtils.host(it.url)
+            if (host.isNotEmpty() && !entries.containsKey(host)) entries[host] = it
+        }
+        Store.topSites(HOME_TILES * 2).forEach {
+            val host = UrlUtils.host(it.url)
+            if (entries.size < HOME_TILES && host.isNotEmpty() && !entries.containsKey(host)) {
+                entries[host] = it
+            }
         }
 
         val sites = JSONArray()
         val missingHosts = mutableListOf<String>()
 
-        entries.values.take(6).forEach { entry ->
+        entries.values.take(HOME_TILES).forEach { entry ->
             val host = UrlUtils.host(entry.url)
             val icon = FaviconStore.dataUri(host)
             if (icon == null && host.isNotEmpty()) missingHosts += host
@@ -1251,5 +1259,15 @@ class BrowserActivity : AppCompatActivity(), PanelController.Callbacks {
 
         /** Let late scripts and lazy content settle before judging navigability. */
         private const val AUTO_POINTER_DELAY = 900L
+
+        /**
+         * Shortcut tiles on the start page. Five plus the "Add shortcut" tile
+         * fills two rows of three, which is what fits above the fold once the
+         * toolbar's reserved space is taken out — and the Add tile has to stay
+         * visible without scrolling to be any use. Newly pinned sites go to the
+         * front of the bookmark list, so they always appear here; the full list
+         * lives in the Bookmarks panel.
+         */
+        private const val HOME_TILES = 5
     }
 }

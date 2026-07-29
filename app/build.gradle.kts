@@ -11,8 +11,8 @@ android {
         applicationId = "app.orbit"
         minSdk = 21
         targetSdk = 34
-        versionCode = 13
-        versionName = "0.7.0"
+        versionCode = 14
+        versionName = "0.7.1"
         resourceConfigurations += listOf("en")
     }
 
