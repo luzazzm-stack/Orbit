@@ -1,20 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Generated from orbit-foreground.svg. Do not hand-edit; regenerate with
+     scratchpad/icons/svg2vd.py if the source artwork changes. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <group
-        android:pivotX="54"
-        android:pivotY="54"
-        android:rotation="-28">
-        <path
-            android:pathData="M54,54 m-27,0 a27,14 0 1,0 54,0 a27,14 0 1,0 -54,0"
-            android:strokeColor="#6AA6FF"
-            android:strokeWidth="5" />
-    </group>
     <path
-        android:fillColor="#E8ECF2"
-        android:pathData="M54,54 m-11,0 a11,11 0 1,0 22,0 a11,11 0 1,0 -22,0" />
+        android:fillColor="#6366F1"
+        android:pathData="M30,25L56,25A9,9 0 0 1 65,34L65,60A9,9 0 0 1 56,69L30,69A9,9 0 0 1 21,60L21,34A9,9 0 0 1 30,25Z" />
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M52,39L78,39A9,9 0 0 1 87,48L87,74A9,9 0 0 1 78,83L52,83A9,9 0 0 1 43,74L43,48A9,9 0 0 1 52,39Z" />
+    <path
+        android:fillColor="#4C3FC4"
+        android:pathData="M52,39L65,39L65,60A9,9 0 0 1 56,69L43,69L43,48A9,9 0 0 1 52,39Z" />
 </vector>

@@ -19,6 +19,10 @@
     <color name="focus_fill">#FFFFFF</color>
     <color name="focus_pressed">#C9D9F2</color>
 
+    <!-- From the supplied artwork; deliberately its own value rather than
+         @color/canvas, so re-theming the app never silently alters the icon. -->
+    <color name="ic_launcher_background">#0B0B14</color>
+
     <color name="scrim">#B3000000</color>
     <color name="transparent">#00000000</color>
 </resources>

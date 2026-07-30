@@ -1,25 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Pre-API-26 launcher icon. Same mark on the app canvas colour. -->
+<!-- Generated from orbit-icon.svg. Do not hand-edit; regenerate with
+     scratchpad/icons/svg2vd.py if the source artwork changes. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="48dp"
     android:height="48dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
     <path
-        android:fillColor="#0A0C10"
-        android:pathData="M0,0h108v108h-108z" />
-
-    <group
-        android:pivotX="54"
-        android:pivotY="54"
-        android:rotation="-28">
-        <path
-            android:pathData="M54,54 m-30,0 a30,16 0 1,0 60,0 a30,16 0 1,0 -60,0"
-            android:strokeColor="#6AA6FF"
-            android:strokeWidth="6" />
-    </group>
+        android:fillColor="#0B0B14"
+        android:pathData="M0,0H108V108H0Z" />
     <path
-        android:fillColor="#E8ECF2"
-        android:pathData="M54,54 m-12,0 a12,12 0 1,0 24,0 a12,12 0 1,0 -24,0" />
+        android:fillColor="#6366F1"
+        android:pathData="M30,25L56,25A9,9 0 0 1 65,34L65,60A9,9 0 0 1 56,69L30,69A9,9 0 0 1 21,60L21,34A9,9 0 0 1 30,25Z" />
+    <path
+        android:fillColor="#A78BFA"
+        android:pathData="M52,39L78,39A9,9 0 0 1 87,48L87,74A9,9 0 0 1 78,83L52,83A9,9 0 0 1 43,74L43,48A9,9 0 0 1 52,39Z" />
+    <path
+        android:fillColor="#4C3FC4"
+        android:pathData="M52,39L65,39L65,60A9,9 0 0 1 56,69L43,69L43,48A9,9 0 0 1 52,39Z" />
 </vector>
